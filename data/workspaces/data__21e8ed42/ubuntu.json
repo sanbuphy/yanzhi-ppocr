@@ -1,0 +1,58 @@
+{
+  "folderName": "ubuntu",
+  "path": "D:\\CODE\\yanzhi\\data\\ubuntu",
+  "workspaceId": "data__21e8ed42",
+  "scanTime": "2026-03-09T15:37:12.876Z",
+  "files": [
+    {
+      "name": "ubuntu.md",
+      "type": "file",
+      "path": "ubuntu.md",
+      "format": "md",
+      "addedTime": "2026-01-07T15:41:18.188Z",
+      "modifiedTime": "2026-01-11T09:15:21.990Z",
+      "size": 4524
+    }
+  ],
+  "children": [
+    {
+      "name": "博客",
+      "type": "folder",
+      "path": "博客",
+      "files": [
+        {
+          "name": "Ubuntu双系统安装-CSDN博客_234138.pdf",
+          "type": "file",
+          "path": "博客/Ubuntu双系统安装-CSDN博客_234138.pdf",
+          "format": "pdf",
+          "addedTime": "2026-01-07T15:41:41.954Z",
+          "modifiedTime": "2026-01-07T15:41:41.956Z",
+          "size": 3145719
+        }
+      ],
+      "children": []
+    }
+  ],
+  "totalFileCount": 2,
+  "fileCount": 2,
+  "allFiles": [
+    {
+      "name": "ubuntu.md",
+      "type": "file",
+      "path": "ubuntu.md",
+      "format": "md",
+      "addedTime": "2026-01-07T15:41:18.188Z",
+      "modifiedTime": "2026-01-11T09:15:21.990Z",
+      "size": 4524
+    },
+    {
+      "name": "Ubuntu双系统安装-CSDN博客_234138.pdf",
+      "type": "file",
+      "path": "博客/Ubuntu双系统安装-CSDN博客_234138.pdf",
+      "format": "pdf",
+      "addedTime": "2026-01-07T15:41:41.954Z",
+      "modifiedTime": "2026-01-07T15:41:41.956Z",
+      "size": 3145719
+    }
+  ]
+}

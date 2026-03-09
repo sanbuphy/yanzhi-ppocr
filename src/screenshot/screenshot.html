@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>截图 - 研知科研助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            cursor: crosshair;
+            user-select: none;
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* 遮罩层 - 未选区域变暗 */
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* 选区框 */
+        #selection {
+            position: absolute;
+            border: 3px solid #00ff00;
+            background: rgba(0, 255, 0, 0.05);
+            box-shadow: 0 0 0 1px rgba(0, 140, 0, 0.7);
+            display: none;
+            pointer-events: none;
+        }
+
+        /* 提示信息 */
+        #hint {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: "Microsoft YaHei", sans-serif;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="container">
+        <canvas id="overlay"></canvas>
+        <div id="selection"></div>
+        <div id="hint">拖拽选择区域，松开鼠标后直接进入编辑 | ESC 取消</div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        let isSelecting = false;
+        let startX, startY;
+        let selection = null;
+
+        const selectionEl = document.getElementById('selection');
+        const overlay = document.getElementById('overlay');
+        const overlayCtx = overlay.getContext('2d');
+
+        function initOverlayCanvas() {
+            overlay.width = window.innerWidth;
+            overlay.height = window.innerHeight;
+            resetOverlay();
+        }
+
+        function resetOverlay() {
+            overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+            overlayCtx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+            overlayCtx.fillRect(0, 0, overlay.width, overlay.height);
+        }
+
+        initOverlayCanvas();
+        window.addEventListener('resize', initOverlayCanvas);
+
+        // 鼠标按下 - 开始选择
+        document.addEventListener('mousedown', (e) => {
+            isSelecting = true;
+            startX = e.clientX;
+            startY = e.clientY;
+
+            selectionEl.style.display = 'block';
+            selectionEl.style.left = startX + 'px';
+            selectionEl.style.top = startY + 'px';
+            selectionEl.style.width = '0px';
+            selectionEl.style.height = '0px';
+
+            console.log('[Screenshot] mousedown:', startX, startY);
+        });
+
+        // 鼠标拖动 - 调整选区
+        document.addEventListener('mousemove', (e) => {
+            if (!isSelecting) return;
+
+            const currentX = e.clientX;
+            const currentY = e.clientY;
+
+            const left = Math.min(startX, currentX);
+            const top = Math.min(startY, currentY);
+            const width = Math.abs(currentX - startX);
+            const height = Math.abs(currentY - startY);
+
+            selectionEl.style.left = left + 'px';
+            selectionEl.style.top = top + 'px';
+            selectionEl.style.width = width + 'px';
+            selectionEl.style.height = height + 'px';
+
+            selection = { x: left, y: top, width, height };
+        });
+
+        // 鼠标释放 - 完成选择
+        document.addEventListener('mouseup', () => {
+            if (!isSelecting) return;
+
+            isSelecting = false;
+            console.log('[Screenshot] mouseup, selection:', selection);
+
+            if (selection && selection.width > 10 && selection.height > 10) {
+                // 选区有效，发送为屏幕绝对坐标（DIP）并先清空遮罩，避免残影被截入
+                const absoluteSelection = {
+                    x: Math.round(selection.x + window.screenX),
+                    y: Math.round(selection.y + window.screenY),
+                    width: Math.round(selection.width),
+                    height: Math.round(selection.height)
+                };
+                selectionEl.style.display = 'none';
+                resetOverlay();
+                setTimeout(() => {
+                    ipcRenderer.send('screenshot:confirm', absoluteSelection);
+                }, 20);
+            } else {
+                // 选区太小，重置
+                console.warn('[Screenshot] 选区太小，重置');
+                selection = null;
+                selectionEl.style.display = 'none';
+                resetOverlay();
+            }
+        });
+
+        // 应用遮罩效果
+        function applyOverlay(sel) {
+            overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+            overlayCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+
+            // 绘制遮罩（选区透明）
+            overlayCtx.beginPath();
+            overlayCtx.rect(0, 0, overlay.width, overlay.height);
+            overlayCtx.rect(sel.x, sel.y, sel.width, sel.height);
+            overlayCtx.fill('evenodd');
+        }
+
+        // ESC 键取消
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                ipcRenderer.send('screenshot:cancel');
+            }
+        });
+
+        // 监听主进程的消息
+        ipcRenderer.on('screenshot:selection', (event, sel) => {
+            selection = sel;
+            selectionEl.style.left = sel.x + 'px';
+            selectionEl.style.top = sel.y + 'px';
+            selectionEl.style.width = sel.width + 'px';
+            selectionEl.style.height = sel.height + 'px';
+            selectionEl.style.display = 'block';
+            applyOverlay(sel);
+        });
+    </script>
+</body>
+</html>

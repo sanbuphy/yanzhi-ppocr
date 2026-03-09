@@ -5,13 +5,22 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 // 暴露 API 给渲染进程
 contextBridge.exposeInMainWorld('electronAPI', {
-  // keyboard_manager 控制
-  keyboardManager: {
-    start: () => ipcRenderer.invoke('keyboard-manager:start'),
-    stop: () => ipcRenderer.invoke('keyboard-manager:stop'),
-    status: () => ipcRenderer.invoke('keyboard-manager:status'),
+  // Toast 通知
+  toast: {
+    show: (type, title, message) => ipcRenderer.send('toast:show', { type, title, message }),
   },
-  
+
+  // PDF URL 输入
+  pdf: {
+    onSaveUrl: (callback) => {
+      ipcRenderer.on('pdf:request-url', (event) => callback());
+    },
+    saveUrl: (url) => ipcRenderer.invoke('pdf:save-url', url),
+    onUrlProvided: (callback) => {
+      ipcRenderer.on('pdf:url-provided', (event, url) => callback(url));
+    }
+  },
+
   // 文件夹操作
   folder: {
     open: () => ipcRenderer.invoke('folder:open'),
@@ -25,6 +34,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeUpdateListener: () => {
       ipcRenderer.removeAllListeners('folder:updated');
     },
+  },
+
+  // 工作区生命周期
+  workspace: {
+    setActive: (folderPath) => ipcRenderer.invoke('workspace:setActive', folderPath),
+    clearActive: () => ipcRenderer.invoke('workspace:clearActive'),
+    getActive: () => ipcRenderer.invoke('workspace:getActive'),
   },
   
   // 文件操作
@@ -53,5 +69,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onNotification: (callback) => {
       ipcRenderer.on('schedule:notification', (event, data) => callback(data));
     },
+  },
+
+  // Agent 智能处理
+  agent: {
+    process: (instruction, context) => ipcRenderer.invoke('agent:process', instruction, context),
   }
 });

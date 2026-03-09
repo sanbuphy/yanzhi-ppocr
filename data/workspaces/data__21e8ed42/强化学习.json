@@ -1,0 +1,58 @@
+{
+  "folderName": "强化学习",
+  "path": "D:\\CODE\\yanzhi\\data\\强化学习",
+  "workspaceId": "data__21e8ed42",
+  "scanTime": "2026-03-09T15:37:12.877Z",
+  "files": [
+    {
+      "name": "强化学习.md",
+      "type": "file",
+      "path": "强化学习.md",
+      "format": "md",
+      "addedTime": "2026-01-05T10:36:36.476Z",
+      "modifiedTime": "2026-01-05T10:36:36.476Z",
+      "size": 80
+    }
+  ],
+  "children": [
+    {
+      "name": "文章",
+      "type": "folder",
+      "path": "文章",
+      "files": [
+        {
+          "name": "Continuous time asymptotic representations for adaptive experiments.pdf",
+          "type": "file",
+          "path": "文章/Continuous time asymptotic representations for adaptive experiments.pdf",
+          "format": "pdf",
+          "addedTime": "2026-01-05T10:42:48.692Z",
+          "modifiedTime": "2026-01-05T10:42:48.694Z",
+          "size": 2168651
+        }
+      ],
+      "children": []
+    }
+  ],
+  "totalFileCount": 2,
+  "fileCount": 2,
+  "allFiles": [
+    {
+      "name": "强化学习.md",
+      "type": "file",
+      "path": "强化学习.md",
+      "format": "md",
+      "addedTime": "2026-01-05T10:36:36.476Z",
+      "modifiedTime": "2026-01-05T10:36:36.476Z",
+      "size": 80
+    },
+    {
+      "name": "Continuous time asymptotic representations for adaptive experiments.pdf",
+      "type": "file",
+      "path": "文章/Continuous time asymptotic representations for adaptive experiments.pdf",
+      "format": "pdf",
+      "addedTime": "2026-01-05T10:42:48.692Z",
+      "modifiedTime": "2026-01-05T10:42:48.694Z",
+      "size": 2168651
+    }
+  ]
+}

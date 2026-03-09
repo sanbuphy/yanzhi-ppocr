@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>输入网页 URL - 研知科研助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .input-group {
+            margin-bottom: 25px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #555;
+            font-size: 14px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .input-group input::placeholder {
+            color: #aaa;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .hint {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .hint strong {
+            color: #333;
+        }
+
+        /* 拖拽区域 */
+        -webkit-app-region: drag;
+        .header {
+            -webkit-app-region: drag;
+        }
+
+        .btn-group {
+            -webkit-app-region: no-drag;
+        }
+
+        .input-group {
+            -webkit-app-region: no-drag;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 网页转 PDF</h1>
+            <p>未检测到浏览器调试端口，请手动输入网页 URL</p>
+        </div>
+
+        <div class="input-group">
+            <label for="url-input">网页地址 (URL)</label>
+            <input
+                type="text"
+                id="url-input"
+                placeholder="例如：https://zhuanlan.zhihu.com/p/123456789"
+                autofocus
+            />
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-secondary" id="cancel-btn">取消</button>
+            <button class="btn btn-primary" id="submit-btn">确定</button>
+        </div>
+
+        <div class="hint">
+            <strong>💡 提示：</strong><br>
+            如果您希望自动保存当前浏览器页面，请先关闭所有 Edge 浏览器窗口，<br>
+            然后按 Ctrl+Alt+P 重新尝试，系统将自动以调试模式启动浏览器。
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        const urlInput = document.getElementById('url-input');
+        const submitBtn = document.getElementById('submit-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+
+        // 提交按钮
+        submitBtn.addEventListener('click', () => {
+            const url = urlInput.value.trim();
+            if (url) {
+                ipcRenderer.send('pdf-url-dialog:submit', url);
+                // 关闭窗口
+                const { webContents } = require('electron').remote || window;
+                // 通过窗口关闭
+            } else {
+                urlInput.focus();
+            }
+        });
+
+        // 取消按钮
+        cancelBtn.addEventListener('click', () => {
+            ipcRenderer.send('pdf-url-dialog:cancel');
+        });
+
+        // 回车提交
+        urlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                submitBtn.click();
+            }
+        });
+
+        // ESC 取消
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                cancelBtn.click();
+            }
+        });
+    </script>
+</body>
+</html>

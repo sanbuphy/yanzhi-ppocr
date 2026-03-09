@@ -7,25 +7,62 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// 显示错误提示并聚焦到指定元素
+function showError(message, elementId) {
+  // 使用自定义 Toast 而非 alert，避免阻塞
+  const toast = document.createElement('div');
+  toast.className = 'error-toast';
+  toast.textContent = message;
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ff4444;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    z-index: 9999;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  `;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.remove();
+  }, 3000);
+
+  // 重新聚焦到输入框
+  if (elementId) {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.focus();
+      element.select(); // 选中文本方便用户重新输入
+    }
+  }
+}
+
 // Form submission handler
 const loginForm = document.getElementById('loginForm');
 loginForm.addEventListener('submit', (e) => {
   e.preventDefault();
-  
+
   // Get form data
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const email = emailInput.value;
+  const password = passwordInput.value;
 
   // Validate form
   if (!email || !password) {
-    alert('请填写邮箱和密码');
+    showError('请填写邮箱和密码', email ? 'password' : 'email');
     return;
   }
 
   // Email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
-    alert('请输入有效的邮箱地址');
+    showError('请输入有效的邮箱地址', 'email');
     return;
   }
 
@@ -35,29 +72,39 @@ loginForm.addEventListener('submit', (e) => {
     const user = JSON.parse(userData);
     if (user.email === email && user.password === password) {
       // Email and password match
-      
-      // 启动 keyboard_manager.exe
-      console.log('检查 electronAPI:', window.electronAPI);
-      if (window.electronAPI && window.electronAPI.keyboardManager) {
-        console.log('正在启动 keyboard_manager...');
-        window.electronAPI.keyboardManager.start().then((result) => {
-          console.log('keyboard_manager 启动结果:', result);
-        }).catch((err) => {
-          console.error('keyboard_manager 启动失败:', err);
-        });
-      } else {
-        console.warn('electronAPI 不可用，可能不在 Electron 环境中');
-      }
-      
-      alert('登录成功！');
-      // Redirect to main page
-      window.location.href = '../main/main.html';
+
+      // 显示成功提示
+      const successToast = document.createElement('div');
+      successToast.textContent = '登录成功！';
+      successToast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #4CAF50;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        z-index: 9999;
+        font-size: 14px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      `;
+      document.body.appendChild(successToast);
+
+      setTimeout(() => {
+        successToast.remove();
+        // Redirect to main page
+        window.location.href = '../main/main.html';
+      }, 1000);
+
       console.log('Login successful for:', email);
     } else {
-      alert('邮箱或密码错误');
+      // 密码错误时清空密码框并聚焦
+      passwordInput.value = '';
+      showError('邮箱或密码错误', 'password');
     }
   } else {
-    alert('未找到该账户，请先注册');
+    showError('未找到该账户，请先注册', null);
   }
 });
 

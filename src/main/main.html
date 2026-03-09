@@ -10,6 +10,9 @@
     <div class="app-container">
       <!-- Left Panel: Document Storage -->
       <aside class="left-panel">
+        <button class="collapse-btn collapse-left-btn" id="leftCollapseBtn" title="折叠/展开左侧栏">
+          <span class="collapse-arrow">◀</span>
+        </button>
         <div class="panel-header">
           <h2>文献储存情况</h2>
         </div>
@@ -149,6 +152,9 @@
 
       <!-- Right Panel: AI Smart Explanation -->
       <aside class="right-panel">
+        <button class="collapse-btn collapse-right-btn" id="rightCollapseBtn" title="折叠/展开右侧栏">
+          <span class="collapse-arrow">▶</span>
+        </button>
         <div class="panel-header">
           <h2>AI 智能解释</h2>
         </div>
@@ -160,8 +166,10 @@
 
         <!-- Chat Input -->
         <div class="chat-input-container">
+          <!-- 附件列表 -->
+          <div class="attachment-list" id="attachmentList"></div>
           <div class="file-drop-zone" id="fileDropZone">
-            <p>请拖入一个文件开始AI对话</p>
+            <p>拖入文件或从文件树选择添加附件</p>
           </div>
           <div class="input-wrapper">
             <input type="text" class="chat-input" id="chatInput" placeholder="输入你的问题..." />

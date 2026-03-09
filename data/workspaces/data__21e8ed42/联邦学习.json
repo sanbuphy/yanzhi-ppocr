@@ -1,0 +1,58 @@
+{
+  "folderName": "联邦学习",
+  "path": "D:\\CODE\\yanzhi\\data\\联邦学习",
+  "workspaceId": "data__21e8ed42",
+  "scanTime": "2026-03-09T15:37:12.878Z",
+  "files": [
+    {
+      "name": "联邦学习.md",
+      "type": "file",
+      "path": "联邦学习.md",
+      "format": "md",
+      "addedTime": "2026-01-07T16:15:30.827Z",
+      "modifiedTime": "2026-01-07T16:15:30.827Z",
+      "size": 80
+    }
+  ],
+  "children": [
+    {
+      "name": "博客",
+      "type": "folder",
+      "path": "博客",
+      "files": [
+        {
+          "name": "联邦学习（Federated Learning）-CSDN博客_001604.pdf",
+          "type": "file",
+          "path": "博客/联邦学习（Federated Learning）-CSDN博客_001604.pdf",
+          "format": "pdf",
+          "addedTime": "2026-01-07T16:16:09.109Z",
+          "modifiedTime": "2026-01-07T16:16:09.111Z",
+          "size": 2306885
+        }
+      ],
+      "children": []
+    }
+  ],
+  "totalFileCount": 2,
+  "fileCount": 2,
+  "allFiles": [
+    {
+      "name": "联邦学习.md",
+      "type": "file",
+      "path": "联邦学习.md",
+      "format": "md",
+      "addedTime": "2026-01-07T16:15:30.827Z",
+      "modifiedTime": "2026-01-07T16:15:30.827Z",
+      "size": 80
+    },
+    {
+      "name": "联邦学习（Federated Learning）-CSDN博客_001604.pdf",
+      "type": "file",
+      "path": "博客/联邦学习（Federated Learning）-CSDN博客_001604.pdf",
+      "format": "pdf",
+      "addedTime": "2026-01-07T16:16:09.109Z",
+      "modifiedTime": "2026-01-07T16:16:09.111Z",
+      "size": 2306885
+    }
+  ]
+}

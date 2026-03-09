@@ -1,7 +1,13 @@
-const { app, BrowserWindow, ipcMain, dialog, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Notification, globalShortcut } = require('electron');
 const path = require('node:path');
 const { spawn } = require('child_process');
 const fs = require('fs');
+
+// 引入原生 AI 服务模块
+const { askAI, readPdf, searchArxiv, downloadArxivPdf } = require('./utils/AIProvider');
+
+// 引入 Agent 智能处理模块
+const { processInstruction, getAgent } = require('./agent');
 
 // 解决 Windows 控制台中文乱码问题
 if (process.platform === 'win32') {
@@ -19,107 +25,33 @@ if (require('electron-squirrel-startup')) {
 
 // ================= 全局变量 =================
 let mainWindow = null;
-let keyboardManagerProcess = null;  // keyboard_manager.exe 进程
 let folderWatcher = null;  // 文件夹监听器
 let watchedFolderPath = null;  // 当前监听的文件夹路径
 let watchDebounceTimer = null;  // 防抖定时器
 let scheduleCheckInterval = null;  // 定时检查器
 let lastCheckedMinute = -1;  // 上次检查的分钟，避免重复触发
 
+// 新增模块
+let screenshotManager = null;  // 截图管理器（Electron 原生）
+let webToPdfManager = null;    // 网页转 PDF 管理器
+let hotkeyManager = null;      // 统一快捷键管理器
+let textCaptureManager = null; // 文字捕获管理器
+let workspaceScanner = null;   // 工作区扫描器
+const WORKSPACE_SCAN_INTERVAL_MS = 120000;
+
 // ================= 工具函数 =================
 
-/**
- * 启动 keyboard_manager.exe
- */
-function startKeyboardManager() {
-  if (keyboardManagerProcess) {
-    console.log('⚠️ keyboard_manager 已在运行');
-    return { success: true, message: '已在运行' };
-  }
-
-  // exe 文件路径（相对于应用根目录）
-  const exePath = path.join(__dirname, '..', 'tools', 'keyboard_manager.exe');
-  const toolsDir = path.join(__dirname, '..', 'tools');
-
-  console.log('🚀 启动 keyboard_manager.exe...');
-  console.log(`   路径: ${exePath}`);
-
-  try {
-    keyboardManagerProcess = spawn(exePath, [], {
-      cwd: toolsDir,  // 工作目录设为 tools，以便读取 token.env 和 folder_structure.json
-      detached: false,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      windowsHide: false,  // 显示控制台窗口便于调试
-      env: {
-        ...process.env,
-        PYTHONIOENCODING: 'utf-8',  // 强制 Python 使用 UTF-8 编码
-        PYTHONUTF8: '1',  // Python 3.7+ UTF-8 模式
-      },
-    });
-
-    keyboardManagerProcess.stdout.on('data', (data) => {
-      const text = data.toString('utf-8').trim();
-      if (text) console.log(`[KeyboardManager] ${text}`);
-    });
-
-    keyboardManagerProcess.stderr.on('data', (data) => {
-      const text = data.toString('utf-8').trim();
-      if (text) console.error(`[KeyboardManager Error] ${text}`);
-    });
-
-    keyboardManagerProcess.on('close', (code) => {
-      console.log(`[KeyboardManager] 进程退出，退出码: ${code}`);
-      keyboardManagerProcess = null;
-    });
-
-    keyboardManagerProcess.on('error', (err) => {
-      console.error('[KeyboardManager] 启动失败:', err);
-      keyboardManagerProcess = null;
-    });
-
-    console.log('✅ keyboard_manager.exe 已启动');
-    return { success: true, message: '启动成功' };
-
-  } catch (err) {
-    console.error('❌ 启动 keyboard_manager.exe 失败:', err);
-    return { success: false, message: err.message };
-  }
-}
-
-/**
- * 停止 keyboard_manager.exe
- */
-function stopKeyboardManager() {
-  if (keyboardManagerProcess) {
-    console.log('🛑 停止 keyboard_manager.exe...');
-    
-    const pid = keyboardManagerProcess.pid;
-    
-    // Windows 上使用 taskkill 强制终止进程树
-    if (process.platform === 'win32' && pid) {
-      try {
-        // /T 终止进程树，/F 强制终止
-        require('child_process').execSync(`taskkill /PID ${pid} /T /F`, { 
-          stdio: 'ignore',
-          windowsHide: true 
-        });
-        console.log('✅ 已使用 taskkill 终止进程');
-      } catch (err) {
-        // 进程可能已经退出，忽略错误
-        console.log('⚠️ taskkill 执行完成（进程可能已退出）');
-      }
-    } else {
-      // 非 Windows 系统使用 SIGKILL
-      keyboardManagerProcess.kill('SIGKILL');
-    }
-    
-    keyboardManagerProcess = null;
-    return { success: true, message: '已停止' };
-  }
-  return { success: true, message: '未在运行' };
-}
 
 const createWindow = () => {
+  const isDevRuntime = !app.isPackaged || process.env.NODE_ENV === 'development';
+  const startupPage = isDevRuntime
+    ? path.join(__dirname, 'main', 'main.html')
+    : path.join(__dirname, 'index.html');
+
+  if (isDevRuntime) {
+    console.log('[Startup] Development mode detected, bypassing login page.');
+  }
+
   // Create the browser window.
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -131,8 +63,8 @@ const createWindow = () => {
     },
   });
 
-  // and load the index.html of the app.
-  mainWindow.loadFile(path.join(__dirname, 'index.html'));
+  // Choose startup page by runtime mode.
+  mainWindow.loadFile(startupPage);
 
   // Open the DevTools.
   mainWindow.webContents.openDevTools();
@@ -143,9 +75,40 @@ const createWindow = () => {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   createWindow();
-  
+
+  // 初始化快捷键管理器
+  const { initHotkeyManager } = require('./utils/HotkeyManager');
+  hotkeyManager = initHotkeyManager(mainWindow);
+
+  // 初始化截图管理器（Electron 原生实现）
+  const ScreenshotManager = require('./screenshot');
+  screenshotManager = new ScreenshotManager(mainWindow, hotkeyManager);
+  screenshotManager.registerShortcut();
+  console.log('✅ 截图管理器已初始化');
+
+  // 初始化网页转 PDF 管理器
+  const WebToPdf = require('./pdf/WebToPdf');
+  webToPdfManager = new WebToPdf(mainWindow, hotkeyManager);
+  webToPdfManager.registerShortcut();
+  console.log('✅ 网页转 PDF 管理器已初始化');
+
+  // 初始化文字捕获管理器
+  const TextCapture = require('./utils/TextCapture');
+  textCaptureManager = new TextCapture(mainWindow, hotkeyManager);
+  textCaptureManager.registerShortcut();
+  console.log('✅ 文字捕获管理器已初始化');
+
+  // 注册 Ctrl+B 保存选中文字（已实现）
+  // 由 TextCapture 模块处理
+
   // 启动定时推荐检查器
   startScheduleChecker();
+
+  // 初始化工作区扫描器
+  const WorkspaceScanner = require('./workspace/WorkspaceScanner');
+  const dataDir = path.join(__dirname, '..', 'data');
+  workspaceScanner = new WorkspaceScanner(dataDir);
+  console.log('✅ 工作区扫描器已初始化（等待激活工作区）');
 
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
@@ -165,54 +128,116 @@ app.on('window-all-closed', () => {
   }
 });
 
-// 应用退出时停止 keyboard_manager
+// 应用退出时清理资源
 app.on('will-quit', () => {
-  stopKeyboardManager();
+  if (workspaceScanner) {
+    workspaceScanner.stop();
+  }
+  if (screenshotManager) {
+    screenshotManager.destroy();
+  }
+  if (textCaptureManager) {
+    textCaptureManager.destroy();
+  }
+  if (hotkeyManager) {
+    hotkeyManager.unregisterAll();
+  }
 });
 
 app.on('before-quit', () => {
-  stopKeyboardManager();
+  if (workspaceScanner) {
+    workspaceScanner.stop();
+  }
+  if (screenshotManager) {
+    screenshotManager.destroy();
+  }
+  if (textCaptureManager) {
+    textCaptureManager.destroy();
+  }
+  if (hotkeyManager) {
+    hotkeyManager.unregisterAll();
+  }
 });
 
 // 处理进程信号（Ctrl+C 等）
 process.on('SIGINT', () => {
   console.log('\n收到 SIGINT 信号，正在清理...');
-  stopKeyboardManager();
   app.quit();
 });
 
 process.on('SIGTERM', () => {
   console.log('收到 SIGTERM 信号，正在清理...');
-  stopKeyboardManager();
   app.quit();
 });
 
-// Windows 上处理控制台关闭事件
-if (process.platform === 'win32') {
-  process.on('SIGHUP', () => {
-    stopKeyboardManager();
-    app.quit();
-  });
-}
-
-// ================= IPC 通信 =================
-
-// 启动 keyboard_manager
-ipcMain.handle('keyboard-manager:start', async () => {
-  return startKeyboardManager();
+// ================= Toast 通知 IPC =================
+ipcMain.on('toast:show', (event, { type, title, message }) => {
+  // 在主窗口显示 Toast 通知
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('toast:show', { type, title, message });
+  }
 });
 
-// 停止 keyboard_manager
-ipcMain.handle('keyboard-manager:stop', async () => {
-  return stopKeyboardManager();
-});
-
-// 获取 keyboard_manager 状态
-ipcMain.handle('keyboard-manager:status', async () => {
-  return { running: keyboardManagerProcess !== null };
+// ================= PDF 用户输入 URL IPC =================
+ipcMain.handle('pdf:save-url', async (event, url) => {
+  if (webToPdfManager) {
+    await webToPdfManager.handleUserUrl(url);
+  }
 });
 
 // ================= 文件夹操作 IPC =================
+
+// 激活工作区（同一路径复用已有 workspaceId）
+ipcMain.handle('workspace:setActive', async (event, folderPath) => {
+  try {
+    if (!workspaceScanner) {
+      return { success: false, error: '工作区扫描器未初始化' };
+    }
+
+    workspaceScanner.stop();
+    const activated = workspaceScanner.setActiveWorkspace(folderPath);
+
+    // 立即扫描一次，再进入定时扫描
+    await workspaceScanner.scan();
+    workspaceScanner.start(WORKSPACE_SCAN_INTERVAL_MS);
+
+    return {
+      success: true,
+      workspaceId: activated.workspaceId,
+      workspaceDataDir: activated.workspaceDataDir,
+      normalizedPath: activated.normalizedPath,
+    };
+  } catch (err) {
+    console.error('[Workspace] 激活失败:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 清空当前工作区
+ipcMain.handle('workspace:clearActive', async () => {
+  if (workspaceScanner) {
+    workspaceScanner.clearActiveWorkspace();
+  }
+
+  return { success: true };
+});
+
+// 获取当前工作区状态
+ipcMain.handle('workspace:getActive', async () => {
+  const active = workspaceScanner?.currentWorkspace || null;
+
+  return {
+    success: true,
+    active: active
+      ? {
+          workspaceId: active.workspaceId,
+          workspacePath: active.workspacePath,
+          normalizedPath: active.normalizedPath,
+          workspaceDataDir: active.dataDir,
+        }
+      : null,
+  };
+});
 
 // 打开文件夹选择对话框
 ipcMain.handle('folder:open', async () => {
@@ -421,221 +446,46 @@ ipcMain.handle('file:read', async (event, filePath) => {
   }
 });
 
-// 读取 PDF 文件内容（使用 OCR）
+// 读取 PDF 文件内容（使用 pdf-parse 库）
 ipcMain.handle('file:readPdf', async (event, filePath) => {
-  return new Promise((resolve) => {
-    const toolsDir = path.join(__dirname, '..', 'tools');
-    
-    // 转义文件路径
-    const safeFilePath = filePath.replace(/\\/g, '/').replace(/'/g, "\\'");
-    
-    // 使用 Python 调用 OCR 读取 PDF
-    const pythonCode = `
-import sys
-import os
-sys.path.insert(0, r'${toolsDir.replace(/\\/g, '/')}')
+  console.log('[PDF] 开始读取 PDF:', filePath);
 
-try:
-    import fitz  # PyMuPDF
-    from PIL import Image
-    import io
-    from ask_ai import AIClient
-    
-    pdf_path = r'${safeFilePath}'
-    print(f"[Python] 正在读取 PDF: {pdf_path}", file=sys.stderr)
-    
-    if not os.path.exists(pdf_path):
-        print('PDF_ERROR:文件不存在')
-        sys.exit(1)
-    
-    # 打开 PDF
-    doc = fitz.open(pdf_path)
-    total_pages = len(doc)
-    print(f"[Python] PDF 共 {total_pages} 页", file=sys.stderr)
-    
-    all_text = []
-    max_pages = min(5, total_pages)  # 最多处理前5页
-    
-    for page_num in range(max_pages):
-        page = doc[page_num]
-        print(f"[Python] 正在处理第 {page_num + 1} 页...", file=sys.stderr)
-        
-        # 先尝试直接提取文本
-        text = page.get_text()
-        if text.strip():
-            all_text.append(f"--- 第 {page_num + 1} 页 ---")
-            all_text.append(text.strip())
-            print(f"[Python] 第 {page_num + 1} 页: 直接提取文本成功", file=sys.stderr)
-        else:
-            # 如果没有文本，使用 OCR
-            print(f"[Python] 第 {page_num + 1} 页: 无文本，使用 OCR...", file=sys.stderr)
-            # 将页面渲染为图片
-            mat = fitz.Matrix(2, 2)  # 2x 缩放以提高 OCR 精度
-            pix = page.get_pixmap(matrix=mat)
-            img_data = pix.tobytes("png")
-            
-            # 转为 PIL Image
-            img = Image.open(io.BytesIO(img_data))
-            
-            # 初始化 AI 客户端（用于 OCR）
-            client = AIClient(system_prompt="你是一个 OCR 助手，请准确识别图片中的所有文字内容，保持原有格式。")
-            
-            # 调用 OCR
-            ocr_text = client._ocr_image(img)
-            all_text.append(f"--- 第 {page_num + 1} 页 (OCR) ---")
-            all_text.append(ocr_text)
-            print(f"[Python] 第 {page_num + 1} 页: OCR 完成", file=sys.stderr)
-    
-    doc.close()
-    
-    if total_pages > max_pages:
-        all_text.append(f"\\n... (仅显示前 {max_pages} 页，共 {total_pages} 页)")
-    
-    result_text = "\\n\\n".join(all_text)
-    print(f"[Python] PDF 读取完成，内容长度: {len(result_text)}", file=sys.stderr)
-    print('PDF_CONTENT_START')
-    print(result_text)
-    print('PDF_CONTENT_END')
-    
-except ImportError as e:
-    print(f'[Python] 导入错误: {e}', file=sys.stderr)
-    print('PDF_ERROR:缺少 PyMuPDF 库，请运行: pip install PyMuPDF')
-except Exception as e:
-    import traceback
-    print(f'[Python] 异常: {e}', file=sys.stderr)
-    traceback.print_exc(file=sys.stderr)
-    print('PDF_ERROR:' + str(e))
-`;
-    
-    console.log('[PDF OCR] 开始读取 PDF:', filePath);
-    
-    const proc = spawn('python', ['-c', pythonCode], {
-      cwd: toolsDir,
-      env: {
-        ...process.env,
-        PYTHONIOENCODING: 'utf-8',
-        PYTHONUTF8: '1',
-      },
-    });
-    
-    let stdout = '';
-    let stderr = '';
-    
-    // 设置超时（60秒，OCR 可能较慢）
-    const timeout = setTimeout(() => {
-      proc.kill();
-      resolve({ success: false, error: 'PDF 读取超时' });
-    }, 60000);
-    
-    proc.stdout.on('data', (data) => {
-      stdout += data.toString('utf-8');
-    });
-    
-    proc.stderr.on('data', (data) => {
-      stderr += data.toString('utf-8');
-      console.error(`[PDF OCR Error] ${data.toString('utf-8').trim()}`);
-    });
-    
-    proc.on('close', (code) => {
-      clearTimeout(timeout);
-      
-      if (stdout.includes('PDF_CONTENT_START') && stdout.includes('PDF_CONTENT_END')) {
-        const content = stdout
-          .split('PDF_CONTENT_START')[1]
-          .split('PDF_CONTENT_END')[0]
-          .trim();
-        console.log('[PDF OCR] 读取成功，内容长度:', content.length);
-        resolve({ success: true, content });
-      } else if (stdout.includes('PDF_ERROR:')) {
-        const error = stdout.split('PDF_ERROR:')[1].split('\\n')[0].trim();
-        resolve({ success: false, error });
-      } else {
-        resolve({ success: false, error: stderr || '读取 PDF 失败' });
-      }
-    });
-    
-    proc.on('error', (err) => {
-      clearTimeout(timeout);
-      resolve({ success: false, error: err.message });
-    });
-  });
-});
+  try {
+    const result = await readPdf(filePath, 5);
 
-// AI 问答（调用 Python ask_ai）
-ipcMain.handle('ai:ask', async (event, question, fileContent, fileName) => {
-  return new Promise((resolve) => {
-    const toolsDir = path.join(__dirname, '..', 'tools');
-    
-    // 构建提示词
-    let prompt = question;
-    if (fileContent && fileName) {
-      prompt = `我正在阅读文件《${fileName}》，内容如下：\n\n${fileContent.substring(0, 3000)}${fileContent.length > 3000 ? '\n...（内容已截断）' : ''}\n\n用户问题：${question}`;
+    if (result.success) {
+      console.log('[PDF] 读取成功，内容长度:', result.content.length);
+      return { success: true, content: result.content };
+    } else {
+      console.error('[PDF] 读取失败:', result.error);
+      return { success: false, error: result.error };
     }
-    
-    // 转义特殊字符用于 Python 字符串
-    const escapedPrompt = prompt
-      .replace(/\\/g, '\\\\')
-      .replace(/'/g, "\\'")
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '');
-    
-    const pythonCode = `
-import sys
-sys.path.insert(0, r'${toolsDir.replace(/\\/g, '/')}')
-from ask_ai import ask_ai
-
-try:
-    response = ask_ai(text="""${escapedPrompt}""")
-    print('AI_RESPONSE_START')
-    print(response)
-    print('AI_RESPONSE_END')
-except Exception as e:
-    print('AI_ERROR:' + str(e))
-`;
-    
-    const proc = spawn('python', ['-c', pythonCode], {
-      cwd: toolsDir,
-      env: {
-        ...process.env,
-        PYTHONIOENCODING: 'utf-8',
-        PYTHONUTF8: '1',
-      },
-    });
-    
-    let stdout = '';
-    let stderr = '';
-    
-    proc.stdout.on('data', (data) => {
-      stdout += data.toString('utf-8');
-      console.log(`[AI] ${data.toString('utf-8').trim()}`);
-    });
-    
-    proc.stderr.on('data', (data) => {
-      stderr += data.toString('utf-8');
-      console.error(`[AI Error] ${data.toString('utf-8').trim()}`);
-    });
-    
-    proc.on('close', (code) => {
-      if (stdout.includes('AI_RESPONSE_START') && stdout.includes('AI_RESPONSE_END')) {
-        const response = stdout
-          .split('AI_RESPONSE_START')[1]
-          .split('AI_RESPONSE_END')[0]
-          .trim();
-        resolve({ success: true, response });
-      } else if (stdout.includes('AI_ERROR:')) {
-        const error = stdout.split('AI_ERROR:')[1].trim();
-        resolve({ success: false, error });
-      } else {
-        resolve({ success: false, error: stderr || 'AI 调用失败' });
-      }
-    });
-    
-    proc.on('error', (err) => {
-      resolve({ success: false, error: err.message });
-    });
-  });
+  } catch (err) {
+    console.error('[PDF] 读取错误:', err);
+    return { success: false, error: err.message };
+  }
 });
+
+// AI 问答（使用原生 JS 实现）
+ipcMain.handle('ai:ask', async (event, question, fileContent, fileName) => {
+  console.log('[AI] 开始回答问题:', question);
+
+  try {
+    const result = await askAI(question, fileContent, fileName);
+
+    if (result.success) {
+      console.log('[AI] 回答完成');
+      return { success: true, response: result.response };
+    } else {
+      console.error('[AI] 回答失败:', result.error);
+      return { success: false, error: result.error };
+    }
+  } catch (err) {
+    console.error('[AI] 错误:', err);
+    return { success: false, error: err.message };
+  }
+});
+
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
@@ -644,77 +494,22 @@ except Exception as e:
 
 // 搜索 Arxiv 论文
 ipcMain.handle('arxiv:search', async (event, query, maxResults = 5) => {
-  return new Promise((resolve) => {
-    const toolsDir = path.join(__dirname, '..', 'tools');
-    
-    const pythonCode = `
-import sys
-import json
-sys.path.insert(0, r'${toolsDir.replace(/\\/g, '/')}')
+  console.log('[Arxiv] 搜索:', query);
 
-try:
-    from research_article import ArxivRecommender
-    recommender = ArxivRecommender(max_results=${maxResults})
-    papers = recommender.get_latest_papers("""${query.replace(/"/g, '\\"')}""")
-    print('ARXIV_RESULT:' + json.dumps(papers, ensure_ascii=False))
-except Exception as e:
-    print('ARXIV_ERROR:' + str(e))
-`;
-    
-    console.log('[Arxiv] 搜索:', query);
-    
-    const proc = spawn('python', ['-c', pythonCode], {
-      cwd: toolsDir,
-      env: {
-        ...process.env,
-        PYTHONIOENCODING: 'utf-8',
-        PYTHONUTF8: '1',
-      },
-    });
-    
-    let stdout = '';
-    let stderr = '';
-    
-    // 设置超时（30秒）
-    const timeout = setTimeout(() => {
-      proc.kill();
-      resolve({ success: false, error: '搜索超时' });
-    }, 30000);
-    
-    proc.stdout.on('data', (data) => {
-      stdout += data.toString('utf-8');
-    });
-    
-    proc.stderr.on('data', (data) => {
-      stderr += data.toString('utf-8');
-    });
-    
-    proc.on('close', (code) => {
-      clearTimeout(timeout);
-      
-      if (stdout.includes('ARXIV_RESULT:')) {
-        try {
-          const jsonStr = stdout.split('ARXIV_RESULT:')[1].trim();
-          const papers = JSON.parse(jsonStr);
-          console.log('[Arxiv] 找到', papers.length, '篇论文');
-          resolve({ success: true, papers });
-        } catch (e) {
-          console.error('[Arxiv] JSON 解析失败:', e);
-          resolve({ success: false, error: '结果解析失败: ' + e.message });
-        }
-      } else if (stdout.includes('ARXIV_ERROR:')) {
-        const error = stdout.split('ARXIV_ERROR:')[1].trim();
-        resolve({ success: false, error });
-      } else {
-        resolve({ success: false, error: stderr || '搜索失败' });
-      }
-    });
-    
-    proc.on('error', (err) => {
-      clearTimeout(timeout);
-      resolve({ success: false, error: err.message });
-    });
-  });
+  try {
+    const result = await searchArxiv(query, maxResults);
+
+    if (result.success) {
+      console.log('[Arxiv] 找到', result.papers.length, '篇论文');
+      return { success: true, papers: result.papers };
+    } else {
+      console.error('[Arxiv] 搜索失败:', result.error);
+      return { success: false, error: result.error };
+    }
+  } catch (err) {
+    console.error('[Arxiv] 错误:', err);
+    return { success: false, error: err.message };
+  }
 });
 
 // 下载 PDF 到临时文件夹
@@ -960,81 +755,42 @@ function checkScheduledTasks() {
 // 执行定时搜索并发送通知
 async function triggerScheduledSearch(schedule) {
   try {
-    // 调用 Arxiv 搜索
-    const toolsDir = path.join(__dirname, '..', 'tools');
-    
-    const pythonCode = `
-import sys
-import json
-sys.path.insert(0, r'${toolsDir.replace(/\\/g, '/')}')
+    // 使用原生 JS 调用 Arxiv 搜索
+    const result = await searchArxiv(schedule.keyword, 3);
 
-try:
-    from research_article import ArxivRecommender
-    recommender = ArxivRecommender(max_results=3)
-    papers = recommender.get_latest_papers("""${schedule.keyword.replace(/"/g, '\\"')}""")
-    print('ARXIV_RESULT:' + json.dumps(papers, ensure_ascii=False))
-except Exception as e:
-    print('ARXIV_ERROR:' + str(e))
-`;
-    
-    const proc = spawn('python', ['-c', pythonCode], {
-      cwd: toolsDir,
-      env: {
-        ...process.env,
-        PYTHONIOENCODING: 'utf-8',
-        PYTHONUTF8: '1',
-      },
-    });
-    
-    let stdout = '';
-    
-    proc.stdout.on('data', (data) => {
-      stdout += data.toString('utf-8');
-    });
-    
-    proc.on('close', (code) => {
-      if (stdout.includes('ARXIV_RESULT:')) {
-        try {
-          const jsonStr = stdout.split('ARXIV_RESULT:')[1].trim();
-          const papers = JSON.parse(jsonStr);
-          
-          if (papers.length > 0) {
-            // 发送系统通知
-            const notification = new Notification({
-              title: `📚 定时推荐: ${schedule.keyword}`,
-              body: `找到 ${papers.length} 篇新论文\n${papers[0].title.substring(0, 50)}...`,
-              icon: path.join(__dirname, '..', 'img', 'robot.png'),
-            });
-            
-            notification.on('click', () => {
-              // 点击通知时聚焦窗口并跳转到推荐页面
-              if (mainWindow) {
-                mainWindow.show();
-                mainWindow.focus();
-                mainWindow.webContents.send('schedule:notification', {
-                  keyword: schedule.keyword,
-                  papers: papers
-                });
-              }
-            });
-            
-            notification.show();
-            
-            // 同时发送到渲染进程显示应用内通知
-            if (mainWindow && !mainWindow.isDestroyed()) {
-              mainWindow.webContents.send('schedule:notification', {
-                keyword: schedule.keyword,
-                papers: papers,
-                showInApp: true
-              });
-            }
-          }
-        } catch (e) {
-          console.error('[Schedule] 解析结果失败:', e);
+    if (result.success && result.papers.length > 0) {
+      const papers = result.papers;
+
+      // 发送系统通知
+      const notification = new Notification({
+        title: `📚 定时推荐：${schedule.keyword}`,
+        body: `找到 ${papers.length} 篇新论文\n${papers[0].title.substring(0, 50)}...`,
+        icon: path.join(__dirname, '..', 'img', 'robot.png'),
+      });
+
+      notification.on('click', () => {
+        // 点击通知时聚焦窗口并跳转到推荐页面
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+          mainWindow.webContents.send('schedule:notification', {
+            keyword: schedule.keyword,
+            papers: papers
+          });
         }
+      });
+
+      notification.show();
+
+      // 同时发送到渲染进程显示应用内通知
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('schedule:notification', {
+          keyword: schedule.keyword,
+          papers: papers,
+          showInApp: true
+        });
       }
-    });
-    
+    }
   } catch (err) {
     console.error('[Schedule] 定时搜索失败:', err);
   }
@@ -1088,13 +844,27 @@ ipcMain.handle('schedule:delete', async (event, id) => {
   try {
     const config = loadScheduleConfig();
     config.schedules = config.schedules.filter(s => s.id !== id);
-    
+
     if (saveScheduleConfig(config)) {
       return { success: true };
     } else {
       return { success: false, error: '删除失败' };
     }
   } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// ================= Agent 智能处理 IPC =================
+
+// Agent 智能处理 IPC
+ipcMain.handle('agent:process', async (event, instruction, context = {}) => {
+  console.log('[Agent] 处理指令:', instruction);
+  try {
+    const result = await processInstruction(instruction, context);
+    return { success: true, ...result };
+  } catch (err) {
+    console.error('[Agent] 处理失败:', err);
     return { success: false, error: err.message };
   }
 });

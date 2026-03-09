@@ -7,11 +7,36 @@ let currentFolderPath = null;
 // Current selected file
 let currentFile = null;
 
+// 附件列表
+let attachedFiles = [];
+
 // 是否正在刷新
 let isRefreshing = false;
 
 // 是否正在懒加载（避免触发文件监听刷新）
 let isLazyLoading = false;
+
+// 外部拖拽/上传支持的格式白名单
+const SUPPORTED_UPLOAD_EXTENSIONS = ['pdf', 'txt', 'md', 'jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+function isSupportedUploadExtension(ext) {
+  return SUPPORTED_UPLOAD_EXTENSIONS.includes(String(ext || '').toLowerCase());
+}
+
+function getUnsupportedExtensionList(files) {
+  const unsupported = new Set();
+  files.forEach((file) => {
+    const ext = getFileExtension(file.name);
+    if (!isSupportedUploadExtension(ext)) {
+      unsupported.add(ext || '(无扩展名)');
+    }
+  });
+  return Array.from(unsupported);
+}
+
+function getSupportedFiles(files) {
+  return files.filter((file) => isSupportedUploadExtension(getFileExtension(file.name)));
+}
 
 // ================= 文件夹状态持久化 =================
 
@@ -46,13 +71,21 @@ async function restoreFolderState() {
     
     // 恢复文件夹路径
     currentFolderPath = state.folderPath;
-    
+
     // 读取文件夹内容
     const readResult = await window.electronAPI.folder.read(currentFolderPath);
     if (!readResult.success) {
       console.warn('恢复文件夹失败:', readResult.error);
       sessionStorage.removeItem('folderState');
       return false;
+    }
+
+    // 激活工作区（同一路径复用已有 workspaceId）
+    if (window.electronAPI.workspace?.setActive) {
+      const workspaceResult = await window.electronAPI.workspace.setActive(currentFolderPath);
+      if (!workspaceResult?.success) {
+        console.warn('恢复状态时激活工作区失败:', workspaceResult?.error || '未知错误');
+      }
     }
     
     // 转换为树形数据
@@ -186,11 +219,19 @@ async function openFolder() {
     const folderPath = openResult.path;
     currentFolderPath = folderPath;
     console.log('选择的文件夹:', folderPath);
-    
+
     // 读取文件夹内容
     const readResult = await window.electronAPI.folder.read(folderPath);
     if (!readResult.success) {
       throw new Error(readResult.error || '读取文件夹失败');
+    }
+
+    // 激活工作区（同一路径复用已有 workspaceId）
+    if (window.electronAPI.workspace?.setActive) {
+      const workspaceResult = await window.electronAPI.workspace.setActive(folderPath);
+      if (!workspaceResult?.success) {
+        console.warn('激活工作区失败:', workspaceResult?.error || '未知错误');
+      }
     }
     
     // 将文件系统内容转换为 fileTreeData 格式
@@ -487,10 +528,73 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!restored) {
     renderFileTree();
   }
-  
+
   setupEventListeners();
   loadChatHistory();
+  initCollapseButtons();
 });
+
+// ================= 侧板折叠功能 =================
+
+// 初始化折叠按钮
+function initCollapseButtons() {
+  const leftCollapseBtn = document.getElementById('leftCollapseBtn');
+  const rightCollapseBtn = document.getElementById('rightCollapseBtn');
+  const leftPanel = document.querySelector('.left-panel');
+  const rightPanel = document.querySelector('.right-panel');
+  const appContainer = document.querySelector('.app-container');
+
+  function syncContainerCollapseState() {
+    if (!appContainer || !leftPanel || !rightPanel) return;
+
+    const leftCollapsed = leftPanel.classList.contains('collapsed');
+    const rightCollapsed = rightPanel.classList.contains('collapsed');
+
+    appContainer.classList.remove('left-collapsed', 'right-collapsed', 'both-collapsed');
+    if (leftCollapsed && rightCollapsed) {
+      appContainer.classList.add('both-collapsed');
+    } else if (leftCollapsed) {
+      appContainer.classList.add('left-collapsed');
+    } else if (rightCollapsed) {
+      appContainer.classList.add('right-collapsed');
+    }
+
+    leftCollapseBtn?.classList.toggle('collapsed', leftCollapsed);
+    rightCollapseBtn?.classList.toggle('collapsed', rightCollapsed);
+  }
+
+  // 恢复折叠状态
+  function restoreCollapseState() {
+    const leftCollapsed = localStorage.getItem('leftPanelCollapsed') === 'true';
+    const rightCollapsed = localStorage.getItem('rightPanelCollapsed') === 'true';
+
+    if (!leftPanel || !rightPanel) return;
+    leftPanel.classList.toggle('collapsed', leftCollapsed);
+    rightPanel.classList.toggle('collapsed', rightCollapsed);
+    syncContainerCollapseState();
+  }
+
+  // 左侧板折叠
+  leftCollapseBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!leftPanel) return;
+    leftPanel.classList.toggle('collapsed');
+    syncContainerCollapseState();
+    localStorage.setItem('leftPanelCollapsed', leftPanel.classList.contains('collapsed'));
+  });
+
+  // 右侧板折叠
+  rightCollapseBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!rightPanel) return;
+    rightPanel.classList.toggle('collapsed');
+    syncContainerCollapseState();
+    localStorage.setItem('rightPanelCollapsed', rightPanel.classList.contains('collapsed'));
+  });
+
+  // 页面加载时恢复状态
+  restoreCollapseState();
+}
 
 // Render file tree
 function renderFileTree() {
@@ -613,7 +717,10 @@ function createTreeItem(item, level = 0) {
 // Select file and display
 async function selectFile(file) {
   currentFile = file;
-  
+
+  // 添加到附件列表
+  addAttachment(file);
+
   // 隐藏模板视图和编辑视图
   hideTemplateView();
   hideTemplateEditor();
@@ -636,15 +743,23 @@ async function selectFile(file) {
       displayArea.innerHTML = '';
       displayArea.appendChild(img);
     } else if (file.fileType === 'pdf') {
-      const iframe = document.createElement('iframe');
+      // 创建 PDF 查看器容器
+      const pdfContainer = document.createElement('div');
+      pdfContainer.className = 'pdf-viewer-container';
+
+      // 使用 embed 标签显示 PDF，添加更多参数隐藏工具栏和侧边栏
+      const embed = document.createElement('embed');
       if (file.path) {
-        iframe.src = 'file:///' + file.path.replace(/\\/g, '/');
+        embed.src = 'file:///' + file.path.replace(/\\/g, '/') + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
       } else {
-        iframe.src = file.url || 'https://via.placeholder.com/800x600/333333/ffffff?text=' + encodeURIComponent(file.name);
+        embed.src = (file.url || 'https://via.placeholder.com/800x600/333333/ffffff?text=' + encodeURIComponent(file.name)) + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
       }
-      iframe.className = 'file-preview';
+      embed.className = 'pdf-embed';
+      embed.type = 'application/pdf';
+
+      pdfContainer.appendChild(embed);
       displayArea.innerHTML = '';
-      displayArea.appendChild(iframe);
+      displayArea.appendChild(pdfContainer);
     } else {
       // 读取文本文件内容
       let content = file.content || '文件内容预览';
@@ -685,6 +800,100 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// ================= 附件管理功能 =================
+
+// 获取文件扩展名
+function getFileExtension(filename) {
+  return filename.split('.').pop().toLowerCase();
+}
+
+// 获取文件图标
+function getFileIcon(ext) {
+  const iconMap = {
+    'pdf': '📄',
+    'md': '📝',
+    'markdown': '📝',
+    'txt': '📄',
+    'js': '📜',
+    'ts': '📜',
+    'py': '🐍',
+    'java': '☕',
+    'html': '🌐',
+    'css': '🎨',
+    'json': '📋',
+    'jpg': '🖼️',
+    'jpeg': '🖼️',
+    'png': '🖼️',
+    'gif': '🖼️',
+    'webp': '🖼️'
+  };
+  return iconMap[ext] || '📄';
+}
+
+// 判断文件类型
+function getFileType(ext) {
+  const pdfExts = ['pdf'];
+  const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+  const markdownExts = ['md', 'markdown'];
+  const codeExts = ['js', 'ts', 'py', 'java', 'c', 'cpp', 'h', 'html', 'css', 'json', 'xml'];
+
+  if (pdfExts.includes(ext)) return 'pdf';
+  if (imageExts.includes(ext)) return 'image';
+  if (markdownExts.includes(ext)) return 'markdown';
+  if (codeExts.includes(ext)) return 'code';
+  return 'file';
+}
+
+// 添加附件
+function addAttachment(file) {
+  // 检查是否已存在（通过路径或名称）
+  if (attachedFiles.some(f => (f.path && f.path === file.path) || f.name === file.name)) {
+    console.log('附件已存在:', file.name);
+    return false;
+  }
+
+  attachedFiles.push(file);
+  renderAttachmentList();
+  console.log('添加附件:', file.name, '当前附件数:', attachedFiles.length);
+  return true;
+}
+
+// 移除附件
+function removeAttachment(index) {
+  attachedFiles.splice(index, 1);
+  renderAttachmentList();
+  console.log('移除附件，当前附件数:', attachedFiles.length);
+}
+
+// 清空附件
+function clearAttachments() {
+  attachedFiles = [];
+  renderAttachmentList();
+}
+
+// 渲染附件列表
+function renderAttachmentList() {
+  const container = document.getElementById('attachmentList');
+  if (!container) return;
+
+  if (attachedFiles.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = attachedFiles.map((file, index) => {
+    const ext = getFileExtension(file.name);
+    const icon = getFileIcon(ext);
+    return `
+      <div class="attachment-item" title="${file.name}">
+        <span class="attachment-icon">${icon}</span>
+        <span class="attachment-name">${file.name}</span>
+        <span class="attachment-remove" onclick="removeAttachment(${index})">×</span>
+      </div>
+    `;
+  }).join('');
 }
 
 // Markdown 渲染函数
@@ -1015,21 +1224,143 @@ function setupEventListeners() {
     }
   });
   
-  // File drop zone
+  // File drop zone - 全局拖拽支持
   const dropZone = document.getElementById('fileDropZone');
-  dropZone.addEventListener('dragover', (e) => {
+  const rightPanel = document.querySelector('.right-panel');
+  const middlePanel = document.querySelector('.middle-panel');
+
+  // 创建拖拽遮罩层
+  let dragOverlay = null;
+  const createDragOverlay = () => {
+    if (!dragOverlay) {
+      dragOverlay = document.createElement('div');
+      dragOverlay.className = 'drag-overlay';
+      dragOverlay.innerHTML = `
+        <div class="drag-overlay-content">
+          <svg class="drag-overlay-icon" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          <div class="drag-overlay-text">释放文件以添加</div>
+          <div class="drag-overlay-hint">支持 PDF、图片、文本等格式</div>
+        </div>
+      `;
+      document.body.appendChild(dragOverlay);
+    }
+    return dragOverlay;
+  };
+
+  // 全局拖拽事件 - 防止浏览器默认行为
+  document.addEventListener('dragover', (e) => {
     e.preventDefault();
-    dropZone.classList.add('drag-over');
+    e.dataTransfer.dropEffect = 'copy';
   });
-  
-  dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('drag-over');
-  });
-  
-  dropZone.addEventListener('drop', (e) => {
+
+  document.addEventListener('dragenter', (e) => {
     e.preventDefault();
+    // 检查是否是文件拖拽
+    if (e.dataTransfer.types.includes('Files')) {
+      const overlay = createDragOverlay();
+      overlay.style.display = 'flex';
+      rightPanel?.classList.add('drag-over');
+      middlePanel?.classList.add('drag-over');
+    }
+  });
+
+  document.addEventListener('dragleave', (e) => {
+    // 只有当离开文档时才隐藏遮罩
+    if (e.relatedTarget === null || !document.body.contains(e.relatedTarget)) {
+      if (dragOverlay) {
+        dragOverlay.style.display = 'none';
+      }
+      rightPanel?.classList.remove('drag-over');
+      middlePanel?.classList.remove('drag-over');
+      dropZone.classList.remove('drag-over');
+    }
+  });
+
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
+
+    // 隐藏遮罩
+    if (dragOverlay) {
+      dragOverlay.style.display = 'none';
+    }
+    rightPanel?.classList.remove('drag-over');
+    middlePanel?.classList.remove('drag-over');
     dropZone.classList.remove('drag-over');
-    handleFileUpload(e.dataTransfer.files);
+
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length > 0) {
+      const unsupportedExts = getUnsupportedExtensionList(files);
+      const supportedFiles = getSupportedFiles(files);
+
+      if (unsupportedExts.length > 0) {
+        showAlert(`不支持的文件格式：${unsupportedExts.map(ext => `.${ext}`).join(', ')}<br><br>支持格式：${SUPPORTED_UPLOAD_EXTENSIONS.map(ext => `.${ext}`).join(', ')}`);
+      }
+
+      if (supportedFiles.length === 0) {
+        return;
+      }
+
+      // 仅处理支持的文件
+      supportedFiles.forEach(file => {
+        const ext = getFileExtension(file.name);
+        const fileObj = {
+          name: file.name,
+          path: null,
+          file: file,
+          url: URL.createObjectURL(file),
+          fileType: getFileType(ext)
+        };
+        addAttachment(fileObj);
+      });
+
+      // 显示第一个支持的文件
+      const firstFile = supportedFiles[0];
+      displayFile(firstFile, getFileExtension(firstFile.name));
+    }
+  });
+
+  // 保留原有的 dropZone 事件（用于点击上传）
+  dropZone.addEventListener('click', () => {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.pdf,.txt,.md,.jpg,.jpeg,.png,.gif,.webp';
+    fileInput.multiple = true;
+    fileInput.onchange = (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length > 0) {
+        const unsupportedExts = getUnsupportedExtensionList(files);
+        const supportedFiles = getSupportedFiles(files);
+
+        if (unsupportedExts.length > 0) {
+          showAlert(`不支持的文件格式：${unsupportedExts.map(ext => `.${ext}`).join(', ')}<br><br>支持格式：${SUPPORTED_UPLOAD_EXTENSIONS.map(ext => `.${ext}`).join(', ')}`);
+        }
+
+        if (supportedFiles.length === 0) {
+          return;
+        }
+
+        supportedFiles.forEach(file => {
+          const ext = getFileExtension(file.name);
+          const fileObj = {
+            name: file.name,
+            path: null,
+            file: file,
+            url: URL.createObjectURL(file),
+            fileType: getFileType(ext)
+          };
+          addAttachment(fileObj);
+        });
+
+        // 显示第一个支持的文件
+        const firstFile = supportedFiles[0];
+        displayFile(firstFile, getFileExtension(firstFile.name));
+      }
+    };
+    fileInput.click();
   });
   
   // Template button
@@ -1080,7 +1411,7 @@ function handleFileUpload(files) {
       file: file,
       url: URL.createObjectURL(file)
     };
-    
+
     // Add to first folder or create new folder
     if (fileTreeData.length > 0 && fileTreeData[0].type === 'folder') {
       if (!fileTreeData[0].children) {
@@ -1097,8 +1428,161 @@ function handleFileUpload(files) {
       });
     }
   });
-  
+
   renderFileTree();
+}
+
+// ================= 文件卡片功能 =================
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+}
+
+// 根据文件类型获取图标
+function getFileIcon(ext) {
+  const iconMap = {
+    'pdf': '<svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>',
+    'doc': '<svg viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>',
+    'docx': '<svg viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>',
+    'txt': '<svg viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>',
+    'md': '<svg viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>',
+    'jpg': '<svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>',
+    'jpeg': '<svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>',
+    'png': '<svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>',
+    'gif': '<svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>',
+    'webp': '<svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>',
+    'py': '<svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>',
+    'js': '<svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>',
+    'ts': '<svg viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>',
+    'java': '<svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>',
+    'cpp': '<svg viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>',
+    'c': '<svg viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>',
+    'html': '<svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>',
+    'css': '<svg viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>',
+    'json': '<svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>',
+    'zip': '<svg viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="10" y1="15" x2="10" y2="9"></line><line x1="8" y1="12" x2="12" y2="12"></line></svg>',
+    'mp3': '<svg viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><circle cx="12" cy="15" r="3"></circle></svg>',
+    'mp4': '<svg viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>',
+    'default': '<svg viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>'
+  };
+
+  return iconMap[ext] || iconMap['default'];
+}
+
+// 创建文件卡片
+function createFileCard(file, ext) {
+  const card = document.createElement('div');
+  card.className = 'file-card';
+
+  const icon = getFileIcon(ext);
+
+  card.innerHTML = `
+    <div class="file-card-icon">${icon}</div>
+    <div class="file-card-info">
+      <div class="file-card-name">${file.name}</div>
+      <div class="file-card-meta">${formatFileSize(file.size)} · ${ext.toUpperCase()}</div>
+    </div>
+    <button class="file-card-action" title="发送到 AI">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="22" y1="2" x2="11" y2="13"></line>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+      </svg>
+    </button>
+  `;
+
+  // 点击卡片显示文件内容
+  card.addEventListener('click', (e) => {
+    if (!e.target.closest('.file-card-action')) {
+      displayFile(file, ext);
+    }
+  });
+
+  // 点击发送按钮发送文件到 AI
+  card.querySelector('.file-card-action').addEventListener('click', () => {
+    displayFile(file, ext);
+    document.getElementById('chatInput').focus();
+  });
+
+  return card;
+}
+
+// 添加文件卡片消息
+function addFileCardMessage(cardElement) {
+  const chatMessages = document.getElementById('chatMessages');
+  const messageDiv = document.createElement('div');
+  messageDiv.className = 'message user file-message';
+  messageDiv.appendChild(cardElement);
+  chatMessages.appendChild(messageDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// 显示文件内容
+async function displayFile(file, ext) {
+  const displayArea = document.getElementById('displayArea');
+  displayArea.style.display = 'flex';
+  displayArea.innerHTML = '<div class="loading">加载中...</div>';
+
+  const fileExt = String(ext || getFileExtension(file.name)).toLowerCase();
+  // 仅对外部拖入/上传文件做强格式校验；文件树内部文件沿用原逻辑。
+  if (!file.path && !isSupportedUploadExtension(fileExt)) {
+    await showAlert(`不支持的文件格式：.${fileExt || '(无扩展名)'}<br><br>支持格式：${SUPPORTED_UPLOAD_EXTENSIONS.map(item => `.${item}`).join(', ')}`);
+    displayArea.innerHTML = '<div class="error" style="color: #ff6b6b; padding: 20px;">不支持的文件格式</div>';
+    return;
+  }
+
+  const fileType = getFileType(file.name);
+  const fileObj = {
+    name: file.name,
+    path: file.path || null,
+    file: file,
+    url: file.path ? null : URL.createObjectURL(file),
+    fileType: fileType
+  };
+
+  try {
+    if (fileType === 'image') {
+      const img = document.createElement('img');
+      img.src = fileObj.url;
+      img.className = 'file-preview';
+      displayArea.innerHTML = '';
+      displayArea.appendChild(img);
+    } else if (fileType === 'pdf') {
+      // 创建 PDF 查看器容器
+      const pdfContainer = document.createElement('div');
+      pdfContainer.className = 'pdf-viewer-container';
+
+      const embed = document.createElement('embed');
+      embed.src = fileObj.url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
+      embed.className = 'pdf-embed';
+      embed.type = 'application/pdf';
+
+      pdfContainer.appendChild(embed);
+      displayArea.innerHTML = '';
+      displayArea.appendChild(pdfContainer);
+    } else {
+      // 文本文件直接读取内容
+      const content = await file.text();
+      const div = document.createElement('div');
+      div.className = 'file-preview';
+
+      if (fileType === 'markdown') {
+        const renderedContent = renderMarkdown(content);
+        div.innerHTML = `<div class="markdown-content">${renderedContent}</div>`;
+      } else {
+        div.innerHTML = `<pre style="color: #ffffff; white-space: pre-wrap; padding: 20px;">${escapeHtml(content)}</pre>`;
+      }
+
+      displayArea.innerHTML = '';
+      displayArea.appendChild(div);
+    }
+  } catch (error) {
+    console.error('读取文件失败:', error);
+    displayArea.innerHTML = `<div class="error" style="color: #ff6b6b; padding: 20px;">读取文件失败：${error.message}</div>`;
+  }
 }
 
 // Get file type from extension
@@ -1155,55 +1639,141 @@ async function sendMessage() {
 // 调用 AI API
 async function callAI(userQuery) {
   try {
-    // 获取当前文件内容（如果有）
-    let fileContent = null;
-    let fileName = null;
-    
-    if (currentFile && currentFile.path) {
-      fileName = currentFile.name;
-      // 尝试读取文件内容
-      if (currentFile.fileType === 'markdown' || currentFile.fileType === 'file') {
-        try {
-          const result = await window.electronAPI.file.read(currentFile.path);
-          if (result.success) {
-            fileContent = result.content;
-          }
-        } catch (e) {
-          console.warn('读取文件内容失败:', e);
-        }
-      } else if (currentFile.fileType === 'pdf') {
-        // PDF 文件使用 OCR 读取
-        try {
-          console.log('正在使用 OCR 读取 PDF 文件:', currentFile.path);
-          const result = await window.electronAPI.file.readPdf(currentFile.path);
-          if (result.success) {
-            fileContent = result.content;
-            console.log('PDF OCR 读取成功，内容长度:', fileContent.length);
-          } else {
-            console.warn('PDF OCR 读取失败:', result.error);
-          }
-        } catch (e) {
-          console.warn('PDF OCR 调用失败:', e);
+    // 1. 先尝试通过 Agent 处理（智能意图识别）
+    const agentResult = await window.electronAPI.agent.process(userQuery, {
+      content: currentFile ? currentFile.path : null,
+      contentType: currentFile?.fileType || 'text'
+    });
+
+    if (agentResult.success && agentResult.skill) {
+      removeLoadingMessage();
+      addAIMessage(formatAgentResult(agentResult));
+      return;
+    }
+
+    // 2. 未识别到技能，走普通 AI 问答
+    // 读取所有附件内容
+    let allFileContent = '';
+    let fileNames = [];
+
+    // 首先检查附件列表
+    if (attachedFiles.length > 0) {
+      for (const file of attachedFiles) {
+        const content = await readFileContent(file);
+        if (content) {
+          allFileContent += `\n\n--- ${file.name} ---\n${content}`;
+          fileNames.push(file.name);
         }
       }
+    } else if (currentFile) {
+      // 如果没有附件但有当前文件，读取当前文件
+      const content = await readFileContent(currentFile);
+      if (content) {
+        allFileContent = content;
+        fileNames.push(currentFile.name);
+      }
     }
-    
+
     // 调用 AI API
-    const result = await window.electronAPI.ai.ask(userQuery, fileContent, fileName);
-    
+    const result = await window.electronAPI.ai.ask(
+      userQuery,
+      allFileContent || null,
+      fileNames.join(', ') || null
+    );
+
     // 移除加载消息
     removeLoadingMessage();
-    
+
     if (result.success) {
       addAIMessage(result.response);
+      // 发送成功后清空附件
+      clearAttachments();
     } else {
       addAIMessage(`❌ AI 请求失败: ${result.error || '未知错误'}`);
     }
-    
+
   } catch (error) {
     console.error('AI 调用失败:', error);
     removeLoadingMessage();
     addAIMessage(`❌ AI 调用出错: ${error.message}`);
+  }
+}
+
+// 读取文件内容
+async function readFileContent(file) {
+  try {
+    // 如果有 file 对象（拖拽上传的文件）
+    if (file.file && file.file instanceof File) {
+      if (file.fileType === 'pdf') {
+        // PDF 文件需要通过后端处理
+        if (file.path) {
+          const result = await window.electronAPI.file.readPdf(file.path);
+          if (result.success) {
+            return result.content;
+          }
+        }
+        // 没有路径的话，无法读取 PDF 内容
+        console.warn('PDF 文件没有本地路径，无法读取内容');
+        return null;
+      }
+      // 其他文件类型直接读取文本
+      return await file.file.text();
+    }
+
+    // 如果有本地路径（从文件树选择的文件）
+    if (file.path) {
+      if (file.fileType === 'pdf') {
+        const result = await window.electronAPI.file.readPdf(file.path);
+        if (result.success) {
+          return result.content;
+        }
+      } else {
+        const result = await window.electronAPI.file.read(file.path);
+        if (result.success) {
+          return result.content;
+        }
+      }
+    }
+
+    return null;
+  } catch (e) {
+    console.warn('读取文件内容失败:', file.name, e);
+    return null;
+  }
+}
+
+// 格式化 Agent 处理结果
+function formatAgentResult(result) {
+  if (!result.success) {
+    return `❌ 处理失败: ${result.error || '未知错误'}`;
+  }
+
+  const { skill, result: data } = result;
+
+  switch (skill) {
+    case 'recommend':
+      const papers = data || [];
+      if (papers.length === 0) return '未找到相关论文';
+      let msg = `📚 找到 ${papers.length} 篇相关论文：\n\n`;
+      papers.forEach((p, i) => {
+        msg += `**${i + 1}. ${p.title}**\n`;
+        msg += `   作者: ${p.authors?.slice(0, 3).join(', ') || '未知'}\n`;
+        if (p.pdfUrl) msg += `   [PDF](${p.pdfUrl})\n`;
+        msg += '\n';
+      });
+      return msg;
+
+    case 'summarize':
+      return `📝 **内容总结**\n\n${data}`;
+
+    case 'classify':
+      return `📁 **分类结果**\n\n${JSON.stringify(data, null, 2)}`;
+
+    case 'schedule':
+      return `⏰ **定时任务已创建**\n\n关键词: ${data.keyword}\n时间: ${data.time}\n重复: ${data.repeat}`;
+
+    default:
+      return JSON.stringify(data, null, 2);
   }
 }
 

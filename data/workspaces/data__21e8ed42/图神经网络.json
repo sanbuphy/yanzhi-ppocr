@@ -1,0 +1,58 @@
+{
+  "folderName": "图神经网络",
+  "path": "D:\\CODE\\yanzhi\\data\\图神经网络",
+  "workspaceId": "data__21e8ed42",
+  "scanTime": "2026-03-09T15:37:12.877Z",
+  "files": [
+    {
+      "name": "图神经网络.md",
+      "type": "file",
+      "path": "图神经网络.md",
+      "format": "md",
+      "addedTime": "2026-01-07T15:45:18.376Z",
+      "modifiedTime": "2026-01-07T15:45:18.376Z",
+      "size": 83
+    }
+  ],
+  "children": [
+    {
+      "name": "博客",
+      "type": "folder",
+      "path": "博客",
+      "files": [
+        {
+          "name": "图神经网络（GNN）最简单全面原理与代码实现-CSDN博客_234543.pdf",
+          "type": "file",
+          "path": "博客/图神经网络（GNN）最简单全面原理与代码实现-CSDN博客_234543.pdf",
+          "format": "pdf",
+          "addedTime": "2026-01-07T15:45:48.965Z",
+          "modifiedTime": "2026-01-07T15:45:48.967Z",
+          "size": 3165611
+        }
+      ],
+      "children": []
+    }
+  ],
+  "totalFileCount": 2,
+  "fileCount": 2,
+  "allFiles": [
+    {
+      "name": "图神经网络.md",
+      "type": "file",
+      "path": "图神经网络.md",
+      "format": "md",
+      "addedTime": "2026-01-07T15:45:18.376Z",
+      "modifiedTime": "2026-01-07T15:45:18.376Z",
+      "size": 83
+    },
+    {
+      "name": "图神经网络（GNN）最简单全面原理与代码实现-CSDN博客_234543.pdf",
+      "type": "file",
+      "path": "博客/图神经网络（GNN）最简单全面原理与代码实现-CSDN博客_234543.pdf",
+      "format": "pdf",
+      "addedTime": "2026-01-07T15:45:48.965Z",
+      "modifiedTime": "2026-01-07T15:45:48.967Z",
+      "size": 3165611
+    }
+  ]
+}

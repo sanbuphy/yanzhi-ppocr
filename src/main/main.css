@@ -18,8 +18,16 @@ body {
   display: grid;
   grid-template-columns: 300px 1fr 400px;
   height: 100vh;
+  min-height: 0;
   gap: 1px;
   background: #2a2a2a;
+}
+
+.app-container > .left-panel,
+.app-container > .middle-panel,
+.app-container > .right-panel {
+  min-width: 0;
+  min-height: 0;
 }
 
 /* Panel Common Styles */
@@ -40,8 +48,120 @@ body {
   background: #1f1f1f;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
+  transition: width 0.3s ease;
+}
+
+/* Collapse buttons */
+.collapse-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 80px;
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  cursor: pointer;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.collapse-btn:hover {
+  background: #333;
+}
+
+.collapse-left-btn {
+  right: -18px;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+}
+
+.collapse-left-btn:hover {
+  right: -16px;
+}
+
+.collapse-right-btn {
+  left: 0;
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+}
+
+.collapse-right-btn:hover {
+  left: 2px;
+}
+
+.collapse-arrow {
+  font-size: 12px;
+  color: #888;
+  transition: transform 0.3s ease;
+}
+
+.collapse-left-btn.collapsed .collapse-arrow {
+  transform: rotate(180deg);
+}
+
+.collapse-right-btn.collapsed .collapse-arrow {
+  transform: rotate(180deg);
+}
+
+/* Left panel collapsed state */
+.left-panel.collapsed {
+  width: 60px !important;
+  min-width: 60px;
+}
+
+.left-panel.collapsed .panel-header,
+.left-panel.collapsed .search-container,
+.left-panel.collapsed .action-buttons,
+.left-panel.collapsed .folder-status,
+.left-panel.collapsed .file-tree {
+  display: none;
+}
+
+.left-panel.collapsed .bottom-nav {
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 10px;
+}
+
+.left-panel.collapsed .bottom-nav .nav-icon {
+  width: 36px;
+  height: 36px;
+}
+
+.left-panel.collapsed .bottom-nav .nav-icon img {
+  width: 20px;
+  height: 20px;
+}
+
+/* Right panel collapsed state */
+.right-panel.collapsed {
+  width: 60px !important;
+  min-width: 60px;
+}
+
+.right-panel.collapsed .panel-header,
+.right-panel.collapsed .chat-messages,
+.right-panel.collapsed .chat-input-container {
+  display: none;
+}
+
+/* App container collapsed states */
+.app-container.left-collapsed {
+  grid-template-columns: 60px 1fr 400px;
+}
+
+.app-container.right-collapsed {
+  grid-template-columns: 300px 1fr 60px;
+}
+
+.app-container.both-collapsed {
+  grid-template-columns: 60px 1fr 60px;
 }
 
 .search-container {
@@ -957,11 +1077,15 @@ body {
   background: #1f1f1f;
   display: flex;
   flex-direction: column;
+  /* Keep chat layout constrained so input area will not be pushed out of view. */
   overflow: hidden;
+  position: relative;
+  min-height: 0;
 }
 
 .chat-messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 20px;
   display: flex;
@@ -1075,9 +1199,64 @@ body {
 }
 
 .chat-input-container {
+  flex-shrink: 0;
+  margin-top: auto;
   padding: 20px;
   border-top: 1px solid #333333;
   background: #1f1f1f;
+  position: relative;
+  z-index: 2;
+}
+
+/* 附件列表样式 */
+.attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+  min-height: 0;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.attachment-list:empty {
+  display: none;
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #2a2a2a;
+  border: 1px solid #4ade80;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #fff;
+  max-width: 200px;
+}
+
+.attachment-icon {
+  font-size: 14px;
+}
+
+.attachment-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-remove {
+  cursor: pointer;
+  opacity: 0.6;
+  font-size: 16px;
+  color: #f87171;
+  transition: opacity 0.2s;
+}
+
+.attachment-remove:hover {
+  opacity: 1;
 }
 
 .file-drop-zone {
@@ -1164,6 +1343,108 @@ body {
   width: 18px;
   height: 18px;
   filter: brightness(0) invert(1);
+}
+
+/* ================= 文件卡片样式 ================= */
+.file-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  max-width: 100%;
+}
+
+.file-card:hover {
+  border-color: #4ade80;
+  background: #333;
+}
+
+.file-card-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1a1a;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.file-card-icon img {
+  width: 24px;
+  height: 24px;
+}
+
+.file-card-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.file-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-card-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-card-meta {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.file-card-action {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  color: #888;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-card-action:hover {
+  background: #333;
+  color: #4ade80;
+}
+
+.file-card-action svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* 文件消息样式 */
+.file-message {
+  max-width: 90%;
+}
+
+.file-message .file-card {
+  margin: 0;
+}
+
+/* 加载状态样式 */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #888;
+  font-size: 16px;
 }
 
 /* Responsive Design */
@@ -1279,5 +1560,217 @@ body {
 
 .dialog-btn-primary:hover {
   background: linear-gradient(135deg, #e0b584 0%, #d4a574 100%);
+}
+
+/* ================= PDF 查看器样式 ================= */
+.pdf-viewer-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #1a1a1a;
+}
+
+.pdf-embed {
+  width: 100%;
+  height: 100%;
+  border: none;
+  flex: 1;
+}
+
+/* ================= 增强的拖拽区域样式 ================= */
+.file-drop-zone {
+  border: 2px dashed #444444;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  color: #666666;
+  font-size: 12px;
+  margin-bottom: 15px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.file-drop-zone:hover {
+  border-color: #4ade80;
+  background: rgba(74, 222, 128, 0.05);
+}
+
+.file-drop-zone.drag-over {
+  border-color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+  box-shadow: 0 0 20px rgba(74, 222, 128, 0.2);
+}
+
+.file-drop-zone.drag-over::after {
+  content: '释放文件以添加';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 14px;
+  color: #4ade80;
+  font-weight: 500;
+}
+
+/* 整个右侧面板拖拽时的效果 */
+.right-panel.drag-over .chat-messages {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* 中间面板拖拽效果 */
+.middle-panel.drag-over .display-area {
+  border: 3px dashed #4ade80;
+  background: rgba(74, 222, 128, 0.05);
+}
+
+/* 拖拽遮罩层 */
+.drag-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.drag-overlay-content {
+  background: #2a2a2a;
+  border: 2px dashed #4ade80;
+  border-radius: 16px;
+  padding: 40px 60px;
+  text-align: center;
+  color: #ffffff;
+}
+
+.drag-overlay-icon {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 16px;
+  opacity: 0.8;
+}
+
+.drag-overlay-text {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.drag-overlay-hint {
+  font-size: 14px;
+  color: #888;
+  margin-top: 8px;
+}
+
+/* ================= PDF 查看器样式 ================= */
+.pdf-viewer-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #1a1a1a;
+}
+
+.pdf-embed {
+  width: 100%;
+  height: 100%;
+  border: none;
+  flex: 1;
+}
+
+/* ================= 增强的拖拽区域样式 ================= */
+.file-drop-zone {
+  border: 2px dashed #444444;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  color: #666666;
+  font-size: 12px;
+  margin-bottom: 15px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.file-drop-zone:hover {
+  border-color: #4ade80;
+  background: rgba(74, 222, 128, 0.05);
+}
+
+.file-drop-zone.drag-over {
+  border-color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+  box-shadow: 0 0 20px rgba(74, 222, 128, 0.2);
+}
+
+.file-drop-zone.drag-over::after {
+  content: '释放文件以添加';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 14px;
+  color: #4ade80;
+  font-weight: 500;
+}
+
+/* 整个右侧面板拖拽时的效果 */
+.right-panel.drag-over .chat-messages {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* 中间面板拖拽效果 */
+.middle-panel.drag-over .display-area {
+  border: 3px dashed #4ade80;
+  background: rgba(74, 222, 128, 0.05);
+}
+
+/* 拖拽遮罩层 */
+.drag-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.drag-overlay-content {
+  background: #2a2a2a;
+  border: 2px dashed #4ade80;
+  border-radius: 16px;
+  padding: 40px 60px;
+  text-align: center;
+  color: #ffffff;
+}
+
+.drag-overlay-icon {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 16px;
+  opacity: 0.8;
+}
+
+.drag-overlay-text {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.drag-overlay-hint {
+  font-size: 14px;
+  color: #888;
+  margin-top: 8px;
 }
 

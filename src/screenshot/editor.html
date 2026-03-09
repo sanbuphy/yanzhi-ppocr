@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编辑截图 - 研知科研助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: #121212;
+            color: #fff;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #window-dragbar {
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+            background: linear-gradient(180deg, #262626 0%, #1f1f1f 100%);
+            border-bottom: 1px solid #343434;
+            -webkit-app-region: drag;
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        #window-dragbar .title {
+            font-size: 12px;
+            color: #d8d8d8;
+            letter-spacing: 0.2px;
+        }
+
+        #window-dragbar .hint {
+            font-size: 11px;
+            color: #9a9a9a;
+        }
+
+        #stage {
+            flex: 1;
+            background: rgba(8, 8, 8, 0.88);
+            padding: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+            -webkit-app-region: no-drag;
+        }
+
+        #canvas-shell {
+            position: relative;
+            border: 1px solid #303030;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+            background: #1e1e1e;
+        }
+
+        #base-canvas {
+            display: block;
+            background: #2f2f2f;
+            position: relative;
+            z-index: 1;
+        }
+
+        #draw-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 2;
+            cursor: crosshair;
+        }
+
+        #eraser-cursor {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            border-radius: 999px;
+            background: transparent;
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.75);
+            pointer-events: none;
+            z-index: 4;
+            display: none;
+            transform: translate(-50%, -50%);
+        }
+
+        .text-input {
+            position: absolute;
+            min-width: 80px;
+            max-width: 360px;
+            padding: 2px 6px;
+            border: 1px dashed rgba(255, 255, 255, 0.65);
+            background: rgba(0, 0, 0, 0.6);
+            color: #ffffff;
+            outline: none;
+            font-family: "Microsoft YaHei", sans-serif;
+            line-height: 1.4;
+            z-index: 5;
+        }
+
+        #toolbar {
+            height: 66px;
+            background: #232323;
+            border-top: 1px solid #3e3e3e;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 0 18px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-app-region: no-drag;
+        }
+
+        .tool-group {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: nowrap;
+            flex-shrink: 0;
+        }
+
+        .tool-group.actions {
+            margin-left: auto;
+        }
+
+        .tool-btn {
+            border: none;
+            border-radius: 6px;
+            background: #444;
+            color: #fff;
+            cursor: pointer;
+            transition: background 0.2s;
+            height: 38px;
+            min-width: 38px;
+            padding: 0 12px;
+            font-size: 14px;
+            white-space: nowrap;
+            word-break: keep-all;
+            flex-shrink: 0;
+        }
+
+        .tool-btn:hover {
+            background: #5a5a5a;
+        }
+
+        .tool-btn.active {
+            background: #0078d4;
+        }
+
+        .tool-btn.primary {
+            background: #4caf50;
+        }
+
+        .tool-btn.primary:hover {
+            background: #43a047;
+        }
+
+        .tool-btn.warn {
+            background: #9c27b0;
+        }
+
+        .tool-btn.warn:hover {
+            background: #8e24aa;
+        }
+
+        .tool-btn.cancel {
+            background: #f44336;
+        }
+
+        .tool-btn.cancel:hover {
+            background: #e53935;
+        }
+
+        .color-picker {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .color-btn {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+        }
+
+        .color-btn.active {
+            border-color: #fff;
+        }
+
+        .size-slider {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #b7b7b7;
+            font-size: 12px;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .size-slider input[type="range"] {
+            width: 120px;
+            flex-shrink: 0;
+        }
+
+        #loading {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 2000;
+        }
+
+        #loading span {
+            background: rgba(0, 0, 0, 0.86);
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: 1px solid #4c4c4c;
+        }
+
+        #result-modal {
+            position: fixed;
+            inset: 0;
+            display: none;
+            z-index: 2600;
+            overflow: hidden;
+        }
+
+        #result-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.62);
+        }
+
+        #result-panel {
+            position: relative;
+            width: min(760px, calc(100vw - 36px));
+            max-height: min(78vh, 680px);
+            display: flex;
+            flex-direction: column;
+            background: #1f1f1f;
+            border: 1px solid #3a3a3a;
+            border-radius: 10px;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+        }
+
+        #result-header {
+            height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+            border-bottom: 1px solid #333;
+            color: #f1f1f1;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: move;
+            user-select: none;
+        }
+
+        #result-content {
+            padding: 12px 14px;
+            overflow: auto;
+            white-space: pre-wrap;
+            line-height: 1.55;
+            color: #e8e8e8;
+            font-size: 13px;
+            user-select: text;
+        }
+
+        .audit-section {
+            border: 1px solid #383838;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background: #232323;
+        }
+
+        .audit-section > summary {
+            cursor: pointer;
+            padding: 10px 12px;
+            font-size: 13px;
+            color: #f2f2f2;
+            user-select: none;
+            outline: none;
+        }
+
+        .audit-section > summary::-webkit-details-marker {
+            color: #bbbbbb;
+        }
+
+        .audit-pre {
+            margin: 0;
+            padding: 0 12px 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: #e2e2e2;
+            font-size: 12px;
+            line-height: 1.6;
+            font-family: Consolas, "Courier New", monospace;
+        }
+
+        .audit-extra {
+            margin-bottom: 10px;
+            color: #dbdbdb;
+            font-size: 12px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        #result-actions {
+            height: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 0 14px;
+            border-top: 1px solid #333;
+        }
+
+        .result-btn {
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #fff;
+            font-size: 13px;
+            height: 34px;
+            padding: 0 12px;
+            min-width: 88px;
+        }
+
+        .result-btn.copy {
+            background: #2e7d32;
+        }
+
+        .result-btn.copy:hover {
+            background: #256a2a;
+        }
+
+        .result-btn.close {
+            background: #4d4d4d;
+        }
+
+        .result-btn.close:hover {
+            background: #5d5d5d;
+        }
+
+        #result-close-x {
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            color: #d8d8d8;
+            font-size: 18px;
+            line-height: 1;
+            padding: 2px 4px;
+        }
+
+        #result-close-x:hover {
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="window-dragbar">
+            <span class="title">截图编辑器</span>
+            <span class="hint">拖动此栏可移动窗口</span>
+        </div>
+
+        <div id="stage">
+            <div id="canvas-shell">
+                <canvas id="base-canvas"></canvas>
+                <canvas id="draw-canvas"></canvas>
+                <div id="eraser-cursor"></div>
+            </div>
+        </div>
+
+        <div id="toolbar">
+            <div class="tool-group" id="draw-tools">
+                <button class="tool-btn active" data-tool="pen" title="画笔">画笔</button>
+                <button class="tool-btn" data-tool="highlight" title="高亮">高亮</button>
+                <button class="tool-btn" data-tool="text" title="文字">文字</button>
+                <button class="tool-btn" data-tool="eraser" title="橡皮">橡皮</button>
+            </div>
+
+            <div class="tool-group color-picker">
+                <div class="color-btn active" style="background:#ff0000" data-color="#ff0000"></div>
+                <div class="color-btn" style="background:#000000" data-color="#000000"></div>
+                <div class="color-btn" style="background:#0000ff" data-color="#0000ff"></div>
+                <div class="color-btn" style="background:#00ff00" data-color="#00ff00"></div>
+                <div class="color-btn" style="background:#ffff00" data-color="#ffff00"></div>
+                <div class="color-btn" style="background:#ff00ff" data-color="#ff00ff"></div>
+            </div>
+
+            <div class="tool-group size-slider">
+                <span>粗细:</span>
+                <input type="range" id="size-slider" min="1" max="20" value="3">
+                <span id="size-value">3</span>
+            </div>
+
+            <div class="tool-group actions">
+                <button class="tool-btn" id="ai-btn">AI解读</button>
+                <button class="tool-btn warn" id="ai-save-btn">解读并入库</button>
+                <button class="tool-btn primary" id="finish-btn">完成</button>
+                <button class="tool-btn cancel" id="cancel-btn">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading"><span>AI 正在处理中...</span></div>
+
+    <div id="result-modal">
+        <div id="result-backdrop"></div>
+        <div id="result-panel">
+            <div id="result-header">
+                <span id="result-title">结果</span>
+                <button id="result-close-x" title="关闭">×</button>
+            </div>
+            <div id="result-content"></div>
+            <div id="result-actions">
+                <button class="result-btn copy" id="result-copy-btn">复制内容</button>
+                <button class="result-btn close" id="result-close-btn">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        const baseCanvas = document.getElementById('base-canvas');
+        const baseCtx = baseCanvas.getContext('2d');
+        const drawCanvas = document.getElementById('draw-canvas');
+        const ctx = drawCanvas.getContext('2d');
+        const canvasShell = document.getElementById('canvas-shell');
+        const loading = document.getElementById('loading');
+        const resultModal = document.getElementById('result-modal');
+        const resultTitle = document.getElementById('result-title');
+        const resultContent = document.getElementById('result-content');
+        const resultPanel = document.getElementById('result-panel');
+        const resultHeader = document.getElementById('result-header');
+        const resultCopyBtn = document.getElementById('result-copy-btn');
+        const resultCloseBtn = document.getElementById('result-close-btn');
+        const resultCloseX = document.getElementById('result-close-x');
+        const resultBackdrop = document.getElementById('result-backdrop');
+        const eraserCursor = document.getElementById('eraser-cursor');
+
+        let img = new Image();
+        let currentTool = 'pen';
+        let currentColor = '#ff0000';
+        let lineWidth = 3;
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let activeTextInput = null;
+        let lastModalText = '';
+        let isDraggingResultPanel = false;
+        let dragPanelOffsetX = 0;
+        let dragPanelOffsetY = 0;
+        const DEBUG_TEXT_TOOL = true;
+
+        function logTextTool(message, extra = null) {
+            if (!DEBUG_TEXT_TOOL) {
+                return;
+            }
+            if (extra === null) {
+                console.log(`[TextTool] ${message}`);
+                return;
+            }
+            console.log(`[TextTool] ${message}`, extra);
+        }
+
+        function buildMergedCanvas() {
+            const merged = document.createElement('canvas');
+            merged.width = baseCanvas.width;
+            merged.height = baseCanvas.height;
+            const mergedCtx = merged.getContext('2d');
+            mergedCtx.drawImage(baseCanvas, 0, 0);
+            mergedCtx.drawImage(drawCanvas, 0, 0);
+            return merged;
+        }
+
+        function getCanvasDataUrl() {
+            return buildMergedCanvas().toDataURL('image/png');
+        }
+
+        function setLoading(visible) {
+            loading.style.display = visible ? 'flex' : 'none';
+        }
+
+        function hideResultModal() {
+            resultModal.style.display = 'none';
+        }
+
+        async function copyText(text) {
+            if (!text) {
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                const oldText = resultCopyBtn.textContent;
+                resultCopyBtn.textContent = '已复制';
+                setTimeout(() => {
+                    resultCopyBtn.textContent = oldText;
+                }, 1200);
+            } catch (error) {
+                console.warn('复制失败:', error);
+                resultCopyBtn.textContent = '复制失败';
+                setTimeout(() => {
+                    resultCopyBtn.textContent = '复制内容';
+                }, 1200);
+            }
+        }
+
+        function showResultModal(title, content, options = {}) {
+            resultTitle.textContent = title || '结果';
+            resultContent.innerHTML = '';
+            resultContent.textContent = content || '';
+            lastModalText = content || '';
+
+            const hideCopy = options.hideCopy === true;
+            resultCopyBtn.style.display = hideCopy ? 'none' : 'inline-block';
+            resultCopyBtn.textContent = '复制内容';
+
+            resultModal.style.display = 'block';
+
+            const panelWidth = Math.min(760, window.innerWidth - 36);
+            const top = Math.max(20, Math.round((window.innerHeight - Math.min(680, window.innerHeight * 0.78)) / 2));
+            const left = Math.max(18, Math.round((window.innerWidth - panelWidth) / 2));
+            resultPanel.style.position = 'absolute';
+            resultPanel.style.top = `${top}px`;
+            resultPanel.style.left = `${left}px`;
+        }
+
+        function escapeHtml(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function normalizeMarkdownBlock(raw) {
+            const text = String(raw || '').trim();
+            if (!text) {
+                return '';
+            }
+            if (text.startsWith('```')) {
+                return text.replace(/^```[a-zA-Z0-9]*\n?/, '').replace(/```$/, '').trim();
+            }
+            return text;
+        }
+
+        function markdownOrFallback(raw) {
+            const normalized = normalizeMarkdownBlock(raw);
+            return normalized || '无';
+        }
+
+        function truncateForModal(raw, maxLength = 6000) {
+            const text = String(raw || '');
+            if (text.length <= maxLength) {
+                return text;
+            }
+            return `${text.slice(0, maxLength)}\n\n...（内容较长，已截断显示，共 ${text.length} 字符）`;
+        }
+
+        function prettyJson(raw) {
+            if (!raw) {
+                return '未提供';
+            }
+            try {
+                return JSON.stringify(raw, null, 2);
+            } catch (error) {
+                return `序列化失败: ${error.message || String(error)}`;
+            }
+        }
+
+        function showAiAuditModal(title, payload, extraMeta = '') {
+            const finalAnswer = (payload && typeof payload === 'object')
+                ? (payload.finalAnswer || '')
+                : String(payload || '');
+            const ocrStructuredMarkdown = (payload && typeof payload === 'object')
+                ? (payload.ocrStructuredMarkdown || '')
+                : '';
+            const ocrDebug = (payload && typeof payload === 'object')
+                ? (payload.ocrDebug || null)
+                : null;
+            const finalAnswerDebug = (payload && typeof payload === 'object')
+                ? (payload.finalAnswerDebug || null)
+                : null;
+
+            const answerText = finalAnswer || '无';
+            const ocrText = markdownOrFallback(ocrStructuredMarkdown);
+            const extraInfo = extraMeta ? String(extraMeta).trim() : '';
+
+            const callStatus = {
+                model: (payload && payload.model) || '',
+                isVLM: Boolean(payload && payload.isVLM),
+                usedOcr: Boolean(payload && payload.usedOcr),
+                ocrAttempted: Boolean(ocrDebug && ocrDebug.ocrAttempted),
+                ocrSucceeded: Boolean(ocrDebug && ocrDebug.ocrSucceeded),
+                ocrFallbackUsed: Boolean(ocrDebug && ocrDebug.ocrFallbackUsed),
+                ocrFailureReason: (ocrDebug && ocrDebug.ocrFailureReason) || ''
+            };
+
+            const ocrRawOutputFull = (ocrDebug && Array.isArray(ocrDebug.attempts) && ocrDebug.attempts.length > 0)
+                ? ocrDebug.attempts.map((attempt) => {
+                    const header = `[Attempt ${attempt.attempt || '?'}] strict=${Boolean(attempt.strictMode)} valid=${Boolean(attempt.valid)}`;
+                    const meta = `requestId=${attempt.requestId || ''}, finishReason=${attempt.finishReason || ''}, model=${attempt.model || ''}`;
+                    const body = String(attempt.rawOutput || '').trim() || '(empty output)';
+                    return `${header}\n${meta}\n\n${body}`;
+                }).join('\n\n-----\n\n')
+                : ((ocrDebug && ocrDebug.ocrFailureReason) ? `OCR 失败：${ocrDebug.ocrFailureReason}` : '未提供');
+
+            const finalRawOutputFull = (finalAnswerDebug && String(finalAnswerDebug.rawOutput || '').trim())
+                ? String(finalAnswerDebug.rawOutput)
+                : '未提供';
+
+            const ocrRawOutputForModal = truncateForModal(ocrRawOutputFull);
+            const finalRawOutputForModal = truncateForModal(finalRawOutputFull);
+            const ocrDebugJson = prettyJson(ocrDebug);
+            const finalDebugJson = prettyJson(finalAnswerDebug);
+            const statusJson = prettyJson(callStatus);
+
+            resultTitle.textContent = title || 'AI 解读结果';
+            resultContent.innerHTML = `
+                ${extraInfo ? `<div class="audit-extra">${escapeHtml(extraInfo)}</div>` : ''}
+                <details class="audit-section" open>
+                    <summary>最终回答</summary>
+                    <pre class="audit-pre">${escapeHtml(answerText)}</pre>
+                </details>
+                <details class="audit-section">
+                    <summary>OCR结构化Markdown</summary>
+                    <pre class="audit-pre">${escapeHtml(ocrText)}</pre>
+                </details>
+                <details class="audit-section">
+                    <summary>OCR模型原始输出</summary>
+                    <pre class="audit-pre">${escapeHtml(ocrRawOutputForModal)}</pre>
+                </details>
+                <details class="audit-section">
+                    <summary>主模型原始输出</summary>
+                    <pre class="audit-pre">${escapeHtml(finalRawOutputForModal)}</pre>
+                </details>
+                <details class="audit-section">
+                    <summary>调用状态</summary>
+                    <pre class="audit-pre">${escapeHtml(statusJson)}</pre>
+                </details>
+            `;
+
+            lastModalText = [
+                extraInfo,
+                '',
+                '[最终回答]',
+                answerText,
+                '',
+                '[OCR结构化Markdown]',
+                ocrText,
+                '',
+                '[OCR模型原始输出]',
+                ocrRawOutputFull,
+                '',
+                '[OCR调试元数据]',
+                ocrDebugJson,
+                '',
+                '[主模型原始输出]',
+                finalRawOutputFull,
+                '',
+                '[主模型调试元数据]',
+                finalDebugJson,
+                '',
+                '[调用状态]',
+                statusJson
+            ].join('\n').trim();
+
+            resultCopyBtn.style.display = 'inline-block';
+            resultCopyBtn.textContent = '复制内容';
+            resultModal.style.display = 'block';
+
+            const panelWidth = Math.min(760, window.innerWidth - 36);
+            const top = Math.max(20, Math.round((window.innerHeight - Math.min(680, window.innerHeight * 0.78)) / 2));
+            const left = Math.max(18, Math.round((window.innerWidth - panelWidth) / 2));
+            resultPanel.style.position = 'absolute';
+            resultPanel.style.top = `${top}px`;
+            resultPanel.style.left = `${left}px`;
+        }
+
+        function commitActiveTextInput() {
+            if (!activeTextInput) {
+                return;
+            }
+
+            const input = activeTextInput;
+            const text = input.value.trim();
+            const x = parseFloat(input.dataset.x || '0');
+            const y = parseFloat(input.dataset.y || '0');
+            const color = input.dataset.color || currentColor;
+            const size = parseInt(input.dataset.size || '16', 10);
+            logTextTool('commitActiveTextInput called', { text, x, y, color, size });
+
+            input.remove();
+            activeTextInput = null;
+
+            if (!text) {
+                return;
+            }
+
+            ctx.save();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = color;
+            ctx.font = `${size}px Microsoft YaHei`;
+            ctx.textBaseline = 'top';
+            ctx.fillText(text, x, y);
+            ctx.restore();
+        }
+
+        function cancelActiveTextInput() {
+            if (!activeTextInput) {
+                return;
+            }
+            logTextTool('cancelActiveTextInput called');
+            activeTextInput.remove();
+            activeTextInput = null;
+        }
+
+        function createTextInput(x, y) {
+            commitActiveTextInput();
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'text-input';
+            input.style.left = `${x}px`;
+            input.style.top = `${y}px`;
+            input.style.minWidth = '180px';
+            input.style.height = `${Math.max(26, lineWidth * 6)}px`;
+            input.style.color = currentColor;
+            input.style.fontSize = `${Math.max(14, lineWidth * 6)}px`;
+            input.placeholder = '输入文字后按 Enter';
+            input.dataset.x = String(x);
+            input.dataset.y = String(y);
+            input.dataset.color = currentColor;
+            input.dataset.size = String(Math.max(14, lineWidth * 6));
+            canvasShell.appendChild(input);
+            activeTextInput = input;
+            drawCanvas.style.cursor = 'text';
+            logTextTool('createTextInput created', { x, y, color: currentColor, size: input.dataset.size });
+
+            input.focus();
+            input.addEventListener('keydown', (e) => {
+                logTextTool(`input keydown: ${e.key}`);
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    commitActiveTextInput();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelActiveTextInput();
+                }
+            });
+
+            input.addEventListener('blur', () => {
+                // Keep input visible after blur; explicit Enter/tool switch controls commit.
+                if (activeTextInput === input) {
+                    logTextTool('input blur (kept active, waiting explicit commit)');
+                }
+            });
+        }
+
+        function updateToolCursor() {
+            if (currentTool === 'text') {
+                drawCanvas.style.cursor = 'text';
+            } else if (currentTool === 'eraser') {
+                drawCanvas.style.cursor = 'none';
+            } else {
+                drawCanvas.style.cursor = 'crosshair';
+            }
+        }
+
+        function updateEraserCursorByPoint(x, y) {
+            const visible = currentTool === 'eraser';
+            eraserCursor.style.display = visible ? 'block' : 'none';
+            if (!visible) {
+                return;
+            }
+
+            const size = Math.max(8, lineWidth * 2);
+            eraserCursor.style.width = `${size}px`;
+            eraserCursor.style.height = `${size}px`;
+            eraserCursor.style.left = `${x}px`;
+            eraserCursor.style.top = `${y}px`;
+        }
+
+        ipcRenderer.on('editor:image', (event, dataUrl) => {
+            img.onload = () => {
+                baseCanvas.width = img.width;
+                baseCanvas.height = img.height;
+                drawCanvas.width = img.width;
+                drawCanvas.height = img.height;
+                baseCtx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+                ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                baseCtx.drawImage(img, 0, 0);
+            };
+            img.src = dataUrl;
+        });
+
+        document.querySelectorAll('.tool-btn[data-tool]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                commitActiveTextInput();
+                document.querySelectorAll('.tool-btn[data-tool]').forEach((item) => item.classList.remove('active'));
+                btn.classList.add('active');
+                currentTool = btn.dataset.tool;
+                logTextTool('tool switched', { currentTool });
+                updateToolCursor();
+                updateEraserCursorByPoint(-1000, -1000);
+            });
+        });
+
+        document.querySelectorAll('.color-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.color-btn').forEach((item) => item.classList.remove('active'));
+                btn.classList.add('active');
+                currentColor = btn.dataset.color;
+            });
+        });
+
+        const sizeSlider = document.getElementById('size-slider');
+        const sizeValue = document.getElementById('size-value');
+        sizeSlider.addEventListener('input', () => {
+            lineWidth = parseInt(sizeSlider.value, 10);
+            sizeValue.textContent = String(lineWidth);
+            if (currentTool === 'eraser') {
+                updateEraserCursorByPoint(parseFloat(eraserCursor.style.left || '0'), parseFloat(eraserCursor.style.top || '0'));
+            }
+        });
+
+        function getCanvasPoint(e) {
+            const rect = drawCanvas.getBoundingClientRect();
+            const x = Math.round(e.clientX - rect.left);
+            const y = Math.round(e.clientY - rect.top);
+            return {
+                x: Math.max(0, Math.min(x, drawCanvas.width)),
+                y: Math.max(0, Math.min(y, drawCanvas.height))
+            };
+        }
+
+        drawCanvas.addEventListener('mousedown', (e) => {
+            const point = getCanvasPoint(e);
+            const x = point.x;
+            const y = point.y;
+            logTextTool('drawCanvas mousedown', { currentTool, x, y });
+
+            if (currentTool === 'text') {
+                e.preventDefault();
+                createTextInput(x, y);
+                return;
+            }
+
+            commitActiveTextInput();
+            isDrawing = true;
+            lastX = x;
+            lastY = y;
+            updateEraserCursorByPoint(x, y);
+        });
+
+        drawCanvas.addEventListener('mouseenter', (e) => {
+            const point = getCanvasPoint(e);
+            updateEraserCursorByPoint(point.x, point.y);
+        });
+
+        drawCanvas.addEventListener('mousemove', (e) => {
+            const point = getCanvasPoint(e);
+            updateEraserCursorByPoint(point.x, point.y);
+
+            if (!isDrawing) {
+                return;
+            }
+
+            const x = point.x;
+            const y = point.y;
+
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            if (currentTool === 'eraser') {
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = 'rgba(0,0,0,1)';
+                ctx.lineWidth = Math.max(8, lineWidth * 2);
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = currentTool === 'highlight' ? lineWidth * 4 : lineWidth;
+                ctx.globalAlpha = currentTool === 'highlight' ? 0.3 : 1;
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.restore();
+
+            lastX = x;
+            lastY = y;
+        });
+
+        function stopDrawing() {
+            isDrawing = false;
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1;
+        }
+
+        drawCanvas.addEventListener('mouseup', stopDrawing);
+        drawCanvas.addEventListener('mouseleave', () => {
+            stopDrawing();
+            eraserCursor.style.display = 'none';
+        });
+
+        document.getElementById('ai-btn').addEventListener('click', async () => {
+            commitActiveTextInput();
+            setLoading(true);
+            try {
+                const explanation = await ipcRenderer.invoke('editor:ai-explain', getCanvasDataUrl());
+                if (explanation && typeof explanation === 'object') {
+                    showAiAuditModal('AI 解读结果', explanation);
+                } else {
+                    showResultModal('AI 解读结果', explanation || '未返回内容');
+                }
+            } catch (error) {
+                showResultModal('AI 解读失败', error.message || String(error), { hideCopy: true });
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        document.getElementById('ai-save-btn').addEventListener('click', async () => {
+            commitActiveTextInput();
+            setLoading(true);
+            try {
+                const payload = await ipcRenderer.invoke('editor:explain-and-save', getCanvasDataUrl());
+                const result = payload && payload.result ? payload.result : null;
+                if (result && result.success) {
+                    const meta = `保存路径:\n${result.path}`;
+                    if (payload && payload.explanation && typeof payload.explanation === 'object') {
+                        showAiAuditModal('解读并入库成功', payload.explanation, meta);
+                    } else {
+                        showResultModal('解读并入库成功', `${meta}\n\nAI 解读:\n${payload.explanation || '无'}`);
+                    }
+                } else {
+                    showResultModal('入库失败', result ? result.error : '未知错误', { hideCopy: true });
+                }
+            } catch (error) {
+                showResultModal('解读并入库失败', error.message || String(error), { hideCopy: true });
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        document.getElementById('finish-btn').addEventListener('click', async () => {
+            commitActiveTextInput();
+            try {
+                await ipcRenderer.invoke('editor:finish', getCanvasDataUrl());
+            } catch (error) {
+                showResultModal('完成截图失败', error.message || String(error), { hideCopy: true });
+            }
+        });
+
+        resultCopyBtn.addEventListener('click', () => {
+            copyText(lastModalText);
+        });
+
+        resultCloseBtn.addEventListener('click', hideResultModal);
+        resultCloseX.addEventListener('click', hideResultModal);
+        resultBackdrop.addEventListener('click', hideResultModal);
+
+        resultHeader.addEventListener('mousedown', (e) => {
+            if (e.target === resultCloseX) {
+                return;
+            }
+            isDraggingResultPanel = true;
+            const panelRect = resultPanel.getBoundingClientRect();
+            dragPanelOffsetX = e.clientX - panelRect.left;
+            dragPanelOffsetY = e.clientY - panelRect.top;
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDraggingResultPanel) {
+                return;
+            }
+            const panelRect = resultPanel.getBoundingClientRect();
+            const nextLeft = Math.max(0, Math.min(e.clientX - dragPanelOffsetX, window.innerWidth - panelRect.width));
+            const nextTop = Math.max(0, Math.min(e.clientY - dragPanelOffsetY, window.innerHeight - panelRect.height));
+            resultPanel.style.left = `${nextLeft}px`;
+            resultPanel.style.top = `${nextTop}px`;
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDraggingResultPanel = false;
+        });
+
+        document.getElementById('cancel-btn').addEventListener('click', () => {
+            cancelActiveTextInput();
+            ipcRenderer.send('editor:cancel');
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                document.getElementById('finish-btn').click();
+                return;
+            }
+
+            if (e.key === 'Escape') {
+                if (activeTextInput) {
+                    cancelActiveTextInput();
+                } else if (resultModal.style.display === 'flex') {
+                    hideResultModal();
+                } else {
+                    document.getElementById('cancel-btn').click();
+                }
+            }
+        });
+
+        updateToolCursor();
+    </script>
+</body>
+</html>
