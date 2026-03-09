@@ -54,7 +54,7 @@
 ### 1. API 配置
 本软件默认使用硅基流动（SiliconCloud）提供的 **DeepSeek OCR + Qwen2.5 7B** 模型。
 - 前往 [硅基流动官网](https://cloud.siliconflow.cn/) 注册并申请 API Key。
-- 将申请到的 Key 填入 [tools/token.env](tools/token.env) 文件中。
+- 将申请到的 Key 填入 [data/token.env](data/token.env) 文件中（把txt后缀改为env）。
 
 ### 2. 浏览器配置 (Edge)
 程序需要通过远程调试端口操作浏览器以生成 PDF 或抓取内容。
