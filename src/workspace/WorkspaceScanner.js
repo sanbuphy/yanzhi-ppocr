@@ -351,16 +351,28 @@ class WorkspaceScanner {
      * 生成 summary.json（递归统计所有子目录）
      */
     async generateSummary() {
+        const now = new Date();
+        const oneMonthAgo = new Date(now.getFullYear(), now.getMonth(), 1); // 本月第一天
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30天前
+        
         const summary = {
-            lastScanTime: new Date().toISOString(),
+            lastScanTime: now.toISOString(),
             totalFiles: 0,
             folderCount: 0,
             mdFileCount: 0,
             pdfFileCount: 0,
             imageCount: 0,
             otherCount: 0,
+            // 本月新增统计
+            monthlyNewFiles: 0,
+            monthlyNewNotes: 0,
+            monthlyNewImages: 0,
             recentFiles: [],
-            folders: []
+            recentMonthFiles: [], // 最近一个月的文件
+            folders: [],
+            // 临时变量，写入文件前会删除
+            _oneMonthAgo: oneMonthAgo,
+            _thirtyDaysAgo: thirtyDaysAgo
         };
 
         try {
@@ -458,14 +470,27 @@ class WorkspaceScanner {
             // 全局按添加时间排序，取整个工作区最近5个文件
             allFilesAcrossWorkspace.sort((a, b) => new Date(b.addedTime) - new Date(a.addedTime));
             summary.recentFiles = allFilesAcrossWorkspace.slice(0, 5);
+            
+            // 筛选最近30天内的文件
+            summary.recentMonthFiles = allFilesAcrossWorkspace.filter(file => {
+                const fileDate = new Date(file.addedTime);
+                return fileDate >= summary._thirtyDaysAgo;
+            });
 
             console.log(`[WorkspaceScanner] 最终统计结果:`, {
                 totalFiles: summary.totalFiles,
                 folderCount: summary.folderCount,
                 mdFileCount: summary.mdFileCount,
                 pdfFileCount: summary.pdfFileCount,
-                imageCount: summary.imageCount
+                imageCount: summary.imageCount,
+                monthlyNewFiles: summary.monthlyNewFiles,
+                monthlyNewNotes: summary.monthlyNewNotes,
+                recentMonthFilesCount: summary.recentMonthFiles.length
             });
+            
+            // 删除临时字段
+            delete summary._oneMonthAgo;
+            delete summary._thirtyDaysAgo;
 
             fs.writeFileSync(this.summaryFile, JSON.stringify(summary, null, 2), 'utf-8');
             console.log(`[WorkspaceScanner] 已生成 summary.json: ${this.summaryFile}`);
@@ -519,13 +544,27 @@ class WorkspaceScanner {
                         summary.otherCount++;
                     }
 
-                    allFilesAcrossWorkspace.push({
+                    const fileInfo = {
                         name: item.name,
                         path: filePath,
                         folder: folderName,
                         addedTime: stats.birthtime.toISOString(),
-                        size: stats.size
-                    });
+                        size: stats.size,
+                        ext: ext
+                    };
+                    
+                    allFilesAcrossWorkspace.push(fileInfo);
+                    
+                    // 检查是否为本月新增
+                    const fileDate = new Date(stats.birthtime);
+                    if (fileDate >= summary._oneMonthAgo) {
+                        summary.monthlyNewFiles++;
+                        if (['md', 'txt'].includes(ext)) {
+                            summary.monthlyNewNotes++;
+                        } else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) {
+                            summary.monthlyNewImages++;
+                        }
+                    }
                 }
                 // 注意：这里不递归处理子文件夹，因为子文件夹会在后面的循环中单独处理
             }

@@ -668,6 +668,8 @@ async function fetchKnowledgeItems(categoryId) {
       return [];
     }
 
+    const folderPath = result.folderPath || '';
+
     // 将文件数据转换为知识条目格式
     return result.files.map((file, index) => {
       // 根据文件扩展名确定类型和图标
@@ -693,6 +695,9 @@ async function fetchKnowledgeItems(categoryId) {
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       const dateText = diffDays === 1 ? '1 天前' : `${diffDays} 天前`;
 
+      // 拼接完整文件路径
+      const fullPath = folderPath ? `${folderPath}/${file.name}` : file.path;
+
       return {
         id: index + 1,
         categoryId: categoryId,
@@ -704,7 +709,7 @@ async function fetchKnowledgeItems(categoryId) {
         icon: icon,
         tags: [ext.toUpperCase() || 'FILE'], // 使用文件扩展名作为标签
         summary: `文件大小: ${formatFileSize(file.size)} | 添加时间: ${addedTime.toLocaleDateString()}`,
-        filePath: file.path,
+        filePath: fullPath,
         addedTime: file.addedTime,
         size: file.size
       };
@@ -732,8 +737,17 @@ async function updateOverviewStats() {
     document.getElementById('statNotesValue').textContent = stats.mdFileCount || 0;
     document.getElementById('statImagesValue').textContent = stats.imageCount || 0;
     
-    // 更新最近添加的项目
-    updateRecentItems(stats.recentFiles || []);
+    // 更新本月新增数据
+    const monthlyNewFiles = stats.monthlyNewFiles || 0;
+    const monthlyNewNotes = stats.monthlyNewNotes || 0;
+    document.getElementById('statTotalChange').textContent = `+${monthlyNewFiles} 本月新增`;
+    document.getElementById('statTotalChange').className = monthlyNewFiles > 0 ? 'stat-change positive' : 'stat-change';
+    document.getElementById('statNotesChange').textContent = `+${monthlyNewNotes} 本月新增`;
+    document.getElementById('statNotesChange').className = monthlyNewNotes > 0 ? 'stat-change positive' : 'stat-change';
+    
+    // 更新最近添加的项目（使用最近一个月的文件）
+    const recentMonthFiles = stats.recentMonthFiles || stats.recentFiles || [];
+    updateRecentItems(recentMonthFiles);
     
     console.log('概览统计已更新:', stats);
   } catch (error) {
@@ -788,17 +802,28 @@ async function renderCategorySummary(category) {
     document.getElementById('categoryName').textContent = category.name;
     document.getElementById('knowledgeItemsTitle').textContent = `知识条目分类管理: ${category.name}`;
     
-    // 获取工作区统计数据
-    const statsResult = await window.electronAPI.workspace.getStats();
-    if (statsResult.success) {
-      const stats = statsResult.stats;
+    // 获取当前分类的详细文件列表
+    const detailResult = await window.electronAPI.workspace.getCategoryDetail(category.name);
+    if (detailResult.success && detailResult.files) {
+      const files = detailResult.files;
       
-      // 显示统计信息
-      document.getElementById('categoryDocCount').textContent = stats.mdFileCount || 0;
-      document.getElementById('categoryImageCount').textContent = stats.imageCount || 0;
+      // 统计文档数量（md, txt, pdf）
+      const docCount = files.filter(f => {
+        const ext = (f.format || '').toLowerCase();
+        return ['md', 'txt', 'pdf'].includes(ext);
+      }).length;
       
-      // 可以在页面上添加更多统计信息显示
-      console.log('工作区统计:', stats);
+      // 统计图片数量（jpg, jpeg, png, gif, webp, bmp）
+      const imageCount = files.filter(f => {
+        const ext = (f.format || '').toLowerCase();
+        return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext);
+      }).length;
+      
+      // 显示该分类的统计信息
+      document.getElementById('categoryDocCount').textContent = docCount;
+      document.getElementById('categoryImageCount').textContent = imageCount;
+      
+      console.log(`分类 "${category.name}" 统计: 文档 ${docCount}, 图片 ${imageCount}`);
     } else {
       // 如果获取失败，使用默认值
       document.getElementById('categoryDocCount').textContent = '0';
@@ -852,21 +877,20 @@ async function renderKnowledgeItems(categoryId) {
       ).join('') : '';
       
       return `
-        <div class="knowledge-item-card" data-id="${item.id}">
+        <div class="knowledge-item-card" data-id="${item.id}" data-filepath="${item.filePath}" data-filename="${item.title}" data-type="${item.type}">
           <img src="${iconPath}" alt="${item.type}" class="knowledge-item-icon" />
           <div class="knowledge-item-content">
             <div class="knowledge-item-title">${item.title}</div>
             <div class="knowledge-item-meta">${metaText}</div>
             ${tagsHtml ? `<div class="knowledge-item-tags">${tagsHtml}</div>` : ''}
             <div class="knowledge-item-actions">
-              <button class="knowledge-item-btn" data-action="view-detail" data-id="${item.id}">查看详细</button>
-              <button class="knowledge-item-btn" data-action="view-image" data-id="${item.id}">查看图片</button>
+              <button class="knowledge-item-btn" data-action="view-detail" data-id="${item.id}">查看详情</button>
               <button class="knowledge-item-btn" data-action="ai-explain" data-id="${item.id}">AI解释</button>
             </div>
           </div>
           <div class="knowledge-item-actions-right">
-            <div class="knowledge-item-action-icon refresh" title="刷新" data-id="${item.id}">
-              <img src="../../img/update.png" alt="Refresh" />
+            <div class="knowledge-item-action-icon copy" title="复制文件" data-id="${item.id}">
+              <img src="../../img/unfold.png" alt="Copy" />
             </div>
             <div class="knowledge-item-action-icon delete" title="删除" data-id="${item.id}">
               <img src="../../img/delete.png" alt="Delete" />
@@ -884,23 +908,55 @@ async function renderKnowledgeItems(categoryId) {
         e.stopPropagation();
         const action = btn.getAttribute('data-action');
         const itemId = btn.getAttribute('data-id');
-        handleKnowledgeItemAction(action, itemId);
+        const card = btn.closest('.knowledge-item-card');
+        const filePath = card.getAttribute('data-filepath');
+        const fileName = card.getAttribute('data-filename');
+        const fileType = card.getAttribute('data-type');
+        handleKnowledgeItemAction(action, itemId, filePath, fileName, fileType);
       });
     });
     
     // 绑定右侧图标事件
     document.querySelectorAll('.knowledge-item-action-icon').forEach(icon => {
-      icon.addEventListener('click', (e) => {
+      icon.addEventListener('click', async (e) => {
         e.stopPropagation();
         const itemId = icon.getAttribute('data-id');
-        if (icon.classList.contains('refresh')) {
-          console.log('刷新知识条目，ID:', itemId);
-          // TODO: 实现刷新功能
+        const card = icon.closest('.knowledge-item-card');
+        const filePath = card.getAttribute('data-filepath');
+        const fileName = card.getAttribute('data-filename');
+        
+        if (icon.classList.contains('copy')) {
+          // 复制文件到剪贴板
+          try {
+            const result = await window.electronAPI.file.copy(filePath);
+            if (result.success) {
+              showToast(`已复制文件: ${result.fileName}`);
+            } else {
+              showToast('复制失败: ' + result.error, 'error');
+            }
+          } catch (err) {
+            showToast('复制失败: ' + err.message, 'error');
+          }
         } else if (icon.classList.contains('delete')) {
-          console.log('删除知识条目，ID:', itemId);
-          // TODO: 实现删除功能
-          if (confirm('确定要删除这个知识条目吗？')) {
-            // TODO: 调用删除API
+          // 删除文件
+          if (confirm(`确定要删除 "${fileName}" 吗？\n\n此操作无法撤销！`)) {
+            try {
+              const result = await window.electronAPI.file.delete(filePath);
+              if (result.success) {
+                showToast(`已删除: ${fileName}`);
+                // 移除卡片
+                card.remove();
+                // 更新统计数量
+                if (currentCategory) {
+                  currentCategory.count = Math.max(0, (currentCategory.count || 1) - 1);
+                  document.getElementById('categoryItemCount').textContent = `${currentCategory.count}个知识条目`;
+                }
+              } else {
+                showToast('删除失败: ' + result.error, 'error');
+              }
+            } catch (err) {
+              showToast('删除失败: ' + err.message, 'error');
+            }
           }
         }
       });
@@ -910,23 +966,59 @@ async function renderKnowledgeItems(categoryId) {
   }
 }
 
+// 显示 Toast 通知
+function showToast(message, type = 'success') {
+  // 移除已存在的 toast
+  const existingToast = document.querySelector('.manage-toast');
+  if (existingToast) {
+    existingToast.remove();
+  }
+  
+  const toast = document.createElement('div');
+  toast.className = `manage-toast ${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${type === 'success' ? '✓' : '✕'}</span>
+    <span class="toast-message">${message}</span>
+  `;
+  document.body.appendChild(toast);
+  
+  // 显示动画
+  setTimeout(() => toast.classList.add('show'), 10);
+  
+  // 3秒后自动关闭
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
 // 处理知识条目操作
-function handleKnowledgeItemAction(action, itemId) {
+function handleKnowledgeItemAction(action, itemId, filePath, fileName, fileType) {
   switch (action) {
     case 'view-detail':
-      console.log('查看详细，条目ID:', itemId);
-      // TODO: 实现查看详细功能
-      alert(`查看详细功能开发中...\n条目ID: ${itemId}`);
-      break;
-    case 'view-image':
-      console.log('查看图片，条目ID:', itemId);
-      // TODO: 实现查看图片功能
-      alert(`查看图片功能开发中...\n条目ID: ${itemId}`);
+      console.log('查看详情，文件:', filePath);
+      // 保存跳转参数到 sessionStorage
+      sessionStorage.setItem('pendingFile', JSON.stringify({
+        action: 'view',
+        filePath: filePath,
+        fileName: fileName,
+        fileType: fileType
+      }));
+      // 跳转到主页面
+      window.location.href = '../main/main.html';
       break;
     case 'ai-explain':
-      console.log('AI解释，条目ID:', itemId);
-      // TODO: 实现AI解释功能
-      alert(`AI解释功能开发中...\n条目ID: ${itemId}`);
+      console.log('AI解释，文件:', filePath);
+      // 保存跳转参数到 sessionStorage，包含AI分析指令
+      sessionStorage.setItem('pendingFile', JSON.stringify({
+        action: 'ai-analyze',
+        filePath: filePath,
+        fileName: fileName,
+        fileType: fileType,
+        aiPrompt: '帮我分析这个文件的内容'
+      }));
+      // 跳转到主页面
+      window.location.href = '../main/main.html';
       break;
   }
 }

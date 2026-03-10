@@ -19,6 +19,32 @@ let isLazyLoading = false;
 // 外部拖拽/上传支持的格式白名单
 const SUPPORTED_UPLOAD_EXTENSIONS = ['pdf', 'txt', 'md', 'jpg', 'jpeg', 'png', 'gif', 'webp'];
 
+// 显示 Toast 通知
+function showMainToast(message, type = 'success') {
+  // 移除已存在的 toast
+  const existingToast = document.querySelector('.main-toast');
+  if (existingToast) {
+    existingToast.remove();
+  }
+  
+  const toast = document.createElement('div');
+  toast.className = `main-toast ${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${type === 'success' ? '✓' : '✕'}</span>
+    <span class="toast-message">${message}</span>
+  `;
+  document.body.appendChild(toast);
+  
+  // 显示动画
+  setTimeout(() => toast.classList.add('show'), 10);
+  
+  // 3秒后自动关闭
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
 function isSupportedUploadExtension(ext) {
   return SUPPORTED_UPLOAD_EXTENSIONS.includes(String(ext || '').toLowerCase());
 }
@@ -578,7 +604,182 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   loadChatHistory();
   initCollapseButtons();
+  
+  // 检查是否有从其他页面跳转过来的待处理文件
+  await handlePendingFile();
 });
+
+// 处理从其他页面跳转过来的待处理文件
+async function handlePendingFile() {
+  const pendingFileStr = sessionStorage.getItem('pendingFile');
+  if (!pendingFileStr) return;
+  
+  // 清除待处理项，避免重复处理
+  sessionStorage.removeItem('pendingFile');
+  
+  try {
+    const pendingFile = JSON.parse(pendingFileStr);
+    console.log('[PendingFile] 处理待处理文件:', pendingFile);
+    
+    const { action, filePath, fileName, fileType, aiPrompt } = pendingFile;
+    
+    // 创建一个虚拟的文件对象用于显示
+    const fileData = await loadFileForDisplay(filePath, fileName, fileType);
+    if (!fileData) {
+      console.error('[PendingFile] 无法加载文件:', filePath);
+      return;
+    }
+    
+    // 在展示区显示文件
+    await displayFileFromPath(filePath, fileName, fileType);
+    
+    // 如果是 AI 分析请求，自动发送消息
+    if (action === 'ai-analyze' && aiPrompt) {
+      // 延迟一下确保文件已经显示
+      setTimeout(async () => {
+        await sendAIAnalysisRequest(filePath, fileName, fileType, aiPrompt);
+      }, 500);
+    }
+  } catch (err) {
+    console.error('[PendingFile] 处理待处理文件失败:', err);
+  }
+}
+
+// 从路径加载文件用于显示
+async function loadFileForDisplay(filePath, fileName, fileType) {
+  try {
+    const result = await window.electronAPI.file.read(filePath);
+    if (result.success) {
+      return {
+        name: fileName,
+        path: filePath,
+        type: fileType,
+        content: result.content
+      };
+    }
+    return null;
+  } catch (err) {
+    console.error('[LoadFile] 加载文件失败:', err);
+    return null;
+  }
+}
+
+// 从路径显示文件内容
+async function displayFileFromPath(filePath, fileName, fileType) {
+  const displayArea = document.getElementById('displayArea');
+  displayArea.style.display = 'flex';
+  displayArea.innerHTML = '<div class="loading">加载中...</div>';
+  
+  try {
+    if (fileType === 'image') {
+      // 图片直接显示
+      const img = document.createElement('img');
+      img.src = `file://${filePath}`;
+      img.className = 'file-preview';
+      img.onerror = () => {
+        displayArea.innerHTML = '<div class="error" style="color: #ff6b6b; padding: 20px;">图片加载失败</div>';
+      };
+      displayArea.innerHTML = '';
+      displayArea.appendChild(img);
+    } else if (fileType === 'pdf') {
+      // PDF 使用 embed 显示
+      const pdfContainer = document.createElement('div');
+      pdfContainer.className = 'pdf-viewer-container';
+      
+      const embed = document.createElement('embed');
+      embed.src = `file://${filePath}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`;
+      embed.className = 'pdf-embed';
+      embed.type = 'application/pdf';
+      
+      pdfContainer.appendChild(embed);
+      displayArea.innerHTML = '';
+      displayArea.appendChild(pdfContainer);
+    } else {
+      // 文本文件读取内容
+      const result = await window.electronAPI.file.read(filePath);
+      if (result.success && result.content) {
+        const div = document.createElement('div');
+        div.className = 'file-preview';
+        
+        if (fileType === 'note' || fileName.endsWith('.md')) {
+          const renderedContent = renderMarkdown(result.content);
+          div.innerHTML = `<div class="markdown-content">${renderedContent}</div>`;
+        } else {
+          div.innerHTML = `<pre style="color: #ffffff; white-space: pre-wrap; padding: 20px;">${escapeHtml(result.content)}</pre>`;
+        }
+        
+        displayArea.innerHTML = '';
+        displayArea.appendChild(div);
+      } else {
+        displayArea.innerHTML = '<div class="error" style="color: #ff6b6b; padding: 20px;">无法读取文件内容</div>';
+      }
+    }
+  } catch (error) {
+    console.error('[DisplayFile] 显示文件失败:', error);
+    displayArea.innerHTML = `<div class="error" style="color: #ff6b6b; padding: 20px;">显示文件失败：${error.message}</div>`;
+  }
+}
+
+// 发送 AI 分析请求
+async function sendAIAnalysisRequest(filePath, fileName, fileType, prompt) {
+  try {
+    // 获取文件内容
+    let fileContent = '';
+    if (fileType === 'image') {
+      fileContent = `[图片文件: ${fileName}]`;
+    } else if (fileType === 'pdf') {
+      // 尝试读取 PDF 内容
+      const pdfResult = await window.electronAPI.file.readPdf(filePath);
+      if (pdfResult.success) {
+        fileContent = pdfResult.content;
+      } else {
+        fileContent = `[PDF文件: ${fileName}]`;
+      }
+    } else {
+      const result = await window.electronAPI.file.read(filePath);
+      if (result.success) {
+        fileContent = result.content;
+      }
+    }
+    
+    // 在聊天区显示用户消息
+    const chatMessages = document.getElementById('chatMessages');
+    const userMsgDiv = document.createElement('div');
+    userMsgDiv.className = 'message user';
+    userMsgDiv.innerHTML = `<div class="message-content">${escapeHtml(prompt)}</div>`;
+    chatMessages.appendChild(userMsgDiv);
+    
+    // 显示加载中
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'message assistant';
+    loadingDiv.innerHTML = '<div class="message-content">正在分析文件内容，请稍候...</div>';
+    chatMessages.appendChild(loadingDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    // 调用 AI
+    const aiResult = await window.electronAPI.ai.ask(prompt, fileContent, fileName);
+    
+    // 移除加载消息
+    loadingDiv.remove();
+    
+    // 显示 AI 回复
+    const aiMsgDiv = document.createElement('div');
+    aiMsgDiv.className = 'message assistant';
+    if (aiResult.success) {
+      aiMsgDiv.innerHTML = `<div class="message-content">${renderMarkdown(aiResult.response)}</div>`;
+    } else {
+      aiMsgDiv.innerHTML = `<div class="message-content" style="color: #ff6b6b;">AI 分析失败: ${aiResult.error}</div>`;
+    }
+    chatMessages.appendChild(aiMsgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    // 保存到聊天历史
+    saveChatHistory();
+    
+  } catch (err) {
+    console.error('[AIAnalysis] AI 分析失败:', err);
+  }
+}
 
 // ================= 侧板折叠功能 =================
 
@@ -742,8 +943,38 @@ function createTreeItem(item, level = 0) {
     name.className = 'file-name';
     name.textContent = item.name;
     
+    // 添加删除按钮
+    const deleteBtn = document.createElement('img');
+    deleteBtn.src = '../../img/delete.png';
+    deleteBtn.className = 'file-delete-btn';
+    deleteBtn.title = '删除文件';
+    deleteBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (confirm(`确定要删除 "${item.name}" 吗？\n\n此操作无法撤销！`)) {
+        try {
+          const result = await window.electronAPI.file.delete(item.path);
+          if (result.success) {
+            showMainToast(`已删除: ${item.name}`);
+            // 从文件树中移除
+            fileItem.remove();
+            // 如果当前显示的是这个文件，清空显示区
+            if (currentFile && currentFile.path === item.path) {
+              const displayArea = document.getElementById('displayArea');
+              displayArea.innerHTML = '<div class="empty-state">文件已删除</div>';
+              currentFile = null;
+            }
+          } else {
+            showMainToast('删除失败: ' + result.error, 'error');
+          }
+        } catch (err) {
+          showMainToast('删除失败: ' + err.message, 'error');
+        }
+      }
+    });
+    
     fileItem.appendChild(icon);
     fileItem.appendChild(name);
+    fileItem.appendChild(deleteBtn);
     
     fileItem.addEventListener('click', () => {
       // Update active state

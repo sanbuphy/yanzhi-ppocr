@@ -269,6 +269,16 @@ ipcMain.handle('workspace:getStats', async () => {
       ? JSON.parse(fs.readFileSync(structureFile, 'utf-8'))
       : { folders: [] };
 
+    // 合并 folders 数据：从 structureData 获取描述，从 summaryData 获取文件数量
+    const mergedFolders = (structureData.folders || []).map(folder => {
+      const summaryFolder = (summaryData.folders || []).find(f => f.name === folder.name);
+      return {
+        ...folder,
+        fileCount: summaryFolder?.fileCount || 0,
+        totalSize: summaryFolder?.totalSize || 0
+      };
+    });
+
     return {
       success: true,
       stats: {
@@ -277,7 +287,14 @@ ipcMain.handle('workspace:getStats', async () => {
         mdFileCount: summaryData.mdFileCount || 0,
         pdfFileCount: summaryData.pdfFileCount || 0,
         imageCount: summaryData.imageCount || 0,
-        folders: structureData.folders || []
+        // 本月新增统计
+        monthlyNewFiles: summaryData.monthlyNewFiles || 0,
+        monthlyNewNotes: summaryData.monthlyNewNotes || 0,
+        monthlyNewImages: summaryData.monthlyNewImages || 0,
+        // 最近文件列表
+        recentFiles: summaryData.recentFiles || [],
+        recentMonthFiles: summaryData.recentMonthFiles || [],
+        folders: mergedFolders
       }
     };
   } catch (err) {
@@ -304,6 +321,7 @@ ipcMain.handle('workspace:getCategoryDetail', async (event, categoryName) => {
     return {
       success: true,
       category: categoryName,
+      folderPath: detailData.path || '',  // 返回文件夹完整路径
       files: detailData.allFiles || [],
       totalCount: detailData.totalFileCount || 0
     };
@@ -536,6 +554,52 @@ ipcMain.handle('file:readPdf', async (event, filePath) => {
     }
   } catch (err) {
     console.error('[PDF] 读取错误:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 删除文件
+ipcMain.handle('file:delete', async (event, filePath) => {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return { success: false, error: '文件不存在' };
+    }
+    fs.unlinkSync(filePath);
+    console.log('[File] 已删除文件:', filePath);
+    return { success: true };
+  } catch (err) {
+    console.error('[File] 删除文件失败:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 复制文件到剪贴板（真正复制文件，可以粘贴到其他地方）
+ipcMain.handle('file:copy', async (event, filePath) => {
+  try {
+    const { clipboard, nativeImage } = require('electron');
+    
+    if (!fs.existsSync(filePath)) {
+      return { success: false, error: '文件不存在' };
+    }
+    
+    const ext = path.extname(filePath).toLowerCase();
+    const fileName = path.basename(filePath);
+    
+    // 对于图片文件，复制图片内容
+    if (['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'].includes(ext)) {
+      const image = nativeImage.createFromPath(filePath);
+      clipboard.writeImage(image);
+      console.log('[File] 已复制图片到剪贴板:', filePath);
+    } else {
+      // 对于其他文件，写入文件路径（macOS 可以通过 file:// URL 复制文件）
+      // 使用 NSPasteboard 的方式复制文件
+      clipboard.writeBuffer('public.file-url', Buffer.from(`file://${filePath}`));
+      console.log('[File] 已复制文件到剪贴板:', filePath);
+    }
+    
+    return { success: true, fileName: fileName };
+  } catch (err) {
+    console.error('[File] 复制文件失败:', err);
     return { success: false, error: err.message };
   }
 });

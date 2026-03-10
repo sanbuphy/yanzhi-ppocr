@@ -972,8 +972,10 @@ body {
   filter: brightness(0) invert(1);
 }
 
-.knowledge-item-action-icon.refresh img {
-  filter: brightness(0) invert(1) sepia(100%) saturate(10000%) hue-rotate(90deg);
+.knowledge-item-action-icon.copy img {
+  width: 14px;
+  height: 14px;
+  filter: brightness(0) invert(1) sepia(100%) saturate(10000%) hue-rotate(0deg);
 }
 
 .knowledge-item-action-icon.delete img {
@@ -1005,5 +1007,57 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #555555;
+}
+
+/* Toast 通知样式 */
+.manage-toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: #2d2d2d;
+  color: #ffffff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  z-index: 10000;
+  opacity: 0;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  max-width: 400px;
+}
+
+.manage-toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.manage-toast.success {
+  border-left: 4px solid #4CAF50;
+}
+
+.manage-toast.error {
+  border-left: 4px solid #f44336;
+}
+
+.manage-toast .toast-icon {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.manage-toast.success .toast-icon {
+  color: #4CAF50;
+}
+
+.manage-toast.error .toast-icon {
+  color: #f44336;
+}
+
+.manage-toast .toast-message {
+  flex: 1;
+  word-break: break-word;
 }
 

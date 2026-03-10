@@ -1784,3 +1784,75 @@ img.file-preview {
   margin-top: 8px;
 }
 
+
+/* 文件删除按钮 */
+.file-delete-btn {
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  filter: brightness(0) invert(0.5);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.file-item:hover .file-delete-btn {
+  opacity: 1;
+}
+
+.file-delete-btn:hover {
+  filter: brightness(0) invert(1) sepia(100%) saturate(10000%) hue-rotate(0deg);
+}
+
+/* Toast 通知样式 */
+.main-toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: #2d2d2d;
+  color: #ffffff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  z-index: 10000;
+  opacity: 0;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  max-width: 400px;
+}
+
+.main-toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.main-toast.success {
+  border-left: 4px solid #4CAF50;
+}
+
+.main-toast.error {
+  border-left: 4px solid #f44336;
+}
+
+.main-toast .toast-icon {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.main-toast.success .toast-icon {
+  color: #4CAF50;
+}
+
+.main-toast.error .toast-icon {
+  color: #f44336;
+}
+
+.main-toast .toast-message {
+  flex: 1;
+  word-break: break-word;
+}
