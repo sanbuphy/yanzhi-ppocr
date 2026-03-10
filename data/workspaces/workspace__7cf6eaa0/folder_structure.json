@@ -1,0 +1,29 @@
+{
+  "folders": [
+    {
+      "name": "hello",
+      "path": "D:\\论文阅读\\hello",
+      "description": "存放与\"hello\"相关的文件，如问候语的文本、代码或图片。"
+    },
+    {
+      "name": "test",
+      "path": "D:\\论文阅读\\test",
+      "description": "存放测试相关的文件和代码的文件夹。"
+    },
+    {
+      "name": "大模型",
+      "path": "D:\\论文阅读\\大模型",
+      "description": "存放各种大型复杂模型的文件，如AI大模型权重文件等。"
+    },
+    {
+      "name": "机器学习",
+      "path": "D:\\论文阅读\\机器学习",
+      "description": "包含机器学习相关资料、算法和项目文件的文件夹。"
+    }
+  ],
+  "lastUpdated": "2026-03-10T09:54:07.562Z",
+  "addedFolders": [
+    "hello"
+  ],
+  "removedFolders": []
+}

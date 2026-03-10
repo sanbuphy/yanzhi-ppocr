@@ -201,6 +201,17 @@ ipcMain.handle('workspace:setActive', async (event, folderPath) => {
     await workspaceScanner.scan();
     workspaceScanner.start(WORKSPACE_SCAN_INTERVAL_MS);
 
+    // 通知所有窗口工作区已更新
+    BrowserWindow.getAllWindows().forEach(window => {
+      if (!window.isDestroyed()) {
+        window.webContents.send('workspace:updated', {
+          workspaceId: activated.workspaceId,
+          workspacePath: activated.normalizedPath,
+          action: 'activated'
+        });
+      }
+    });
+
     return {
       success: true,
       workspaceId: activated.workspaceId,
@@ -237,6 +248,69 @@ ipcMain.handle('workspace:getActive', async () => {
         }
       : null,
   };
+});
+
+// 获取工作区统计数据
+ipcMain.handle('workspace:getStats', async () => {
+  try {
+    if (!workspaceScanner?.currentWorkspace) {
+      return { success: false, error: '未激活工作区' };
+    }
+
+    const summaryFile = workspaceScanner.summaryFile;
+    const structureFile = workspaceScanner.structureFile;
+
+    if (!fs.existsSync(summaryFile)) {
+      return { success: false, error: '统计文件不存在' };
+    }
+
+    const summaryData = JSON.parse(fs.readFileSync(summaryFile, 'utf-8'));
+    const structureData = fs.existsSync(structureFile) 
+      ? JSON.parse(fs.readFileSync(structureFile, 'utf-8'))
+      : { folders: [] };
+
+    return {
+      success: true,
+      stats: {
+        totalFiles: summaryData.totalFiles || 0,
+        folderCount: summaryData.folderCount || 0,
+        mdFileCount: summaryData.mdFileCount || 0,
+        pdfFileCount: summaryData.pdfFileCount || 0,
+        imageCount: summaryData.imageCount || 0,
+        folders: structureData.folders || []
+      }
+    };
+  } catch (err) {
+    console.error('[Workspace] 获取统计数据失败:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 获取分类详情（文件夹下的文件列表）
+ipcMain.handle('workspace:getCategoryDetail', async (event, categoryName) => {
+  try {
+    if (!workspaceScanner?.currentWorkspace) {
+      return { success: false, error: '未激活工作区' };
+    }
+
+    const detailFile = path.join(workspaceScanner.currentWorkspace.dataDir, `${categoryName}.json`);
+    
+    if (!fs.existsSync(detailFile)) {
+      return { success: false, error: '分类详情文件不存在' };
+    }
+
+    const detailData = JSON.parse(fs.readFileSync(detailFile, 'utf-8'));
+    
+    return {
+      success: true,
+      category: categoryName,
+      files: detailData.allFiles || [],
+      totalCount: detailData.totalFileCount || 0
+    };
+  } catch (err) {
+    console.error('[Workspace] 获取分类详情失败:', err);
+    return { success: false, error: err.message };
+  }
 });
 
 // 打开文件夹选择对话框

@@ -213,40 +213,56 @@ async function openFolder() {
   try {
     const openResult = await window.electronAPI.folder.open();
     if (!openResult || !openResult.success) {
+      console.log('用户取消了文件夹选择');
       return; // 用户取消选择
     }
-    
+
     const folderPath = openResult.path;
+    console.log('用户选择的文件夹路径:', folderPath);
+
     currentFolderPath = folderPath;
-    console.log('选择的文件夹:', folderPath);
+    console.log('设置当前文件夹路径为:', currentFolderPath);
 
     // 读取文件夹内容
     const readResult = await window.electronAPI.folder.read(folderPath);
     if (!readResult.success) {
-      throw new Error(readResult.error || '读取文件夹失败');
+      console.error('读取文件夹失败:', readResult.error);
+      await showAlert(`无法读取文件夹: ${readResult.error || '未知错误'}\n请确保文件夹存在且有访问权限。`);
+      return;
     }
+
+    console.log('文件夹内容读取成功，项目数量:', readResult.items.length);
 
     // 激活工作区（同一路径复用已有 workspaceId）
     if (window.electronAPI.workspace?.setActive) {
+      console.log('开始激活工作区...');
       const workspaceResult = await window.electronAPI.workspace.setActive(folderPath);
+      console.log('工作区激活结果:', workspaceResult);
+
       if (!workspaceResult?.success) {
         console.warn('激活工作区失败:', workspaceResult?.error || '未知错误');
+        await showAlert('工作区激活失败，但文件夹已打开。您可以在知识体系管理页面查看统计信息。');
+      } else {
+        console.log('工作区激活成功，ID:', workspaceResult.workspaceId);
       }
+    } else {
+      console.warn('工作区API不可用');
     }
-    
+
     // 将文件系统内容转换为 fileTreeData 格式
     fileTreeData = convertToTreeData(readResult.items, folderPath);
     renderFileTree();
-    
+
     // 保存文件夹状态
     saveFolderState();
-    
+
     // 启动文件监听
     await startFolderWatch(folderPath);
-    
+
+    console.log('文件夹打开流程完成');
   } catch (error) {
     console.error('打开文件夹失败:', error);
-    alert('打开文件夹失败: ' + error.message);
+    await showAlert('打开文件夹失败: ' + error.message);
   }
 }
 
@@ -496,7 +512,20 @@ async function createSubFolder() {
     
     if (result.success) {
       console.log('文件夹创建成功:', result.path);
-      
+
+      // 重新激活工作区以更新统计数据
+      if (window.electronAPI.workspace?.setActive) {
+        console.log('重新激活工作区以更新统计...');
+        const workspaceResult = await window.electronAPI.workspace.setActive(currentFolderPath);
+        console.log('工作区重新激活结果:', workspaceResult);
+
+        if (!workspaceResult?.success) {
+          console.warn('重新激活工作区失败:', workspaceResult?.error || '未知错误');
+        } else {
+          console.log('工作区重新激活成功');
+        }
+      }
+
       // 重新读取文件夹内容以刷新列表
       const readResult = await window.electronAPI.folder.read(currentFolderPath);
       if (readResult.success) {
@@ -505,7 +534,7 @@ async function createSubFolder() {
         // 保存文件夹状态
         saveFolderState();
       }
-      
+
       await showAlert(`文件夹 "${folderName}" 创建成功！<br><br>📝 描述: ${result.description || '无'}`);
     } else {
       await showAlert('创建文件夹失败: ' + (result.error || '未知错误'));

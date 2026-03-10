@@ -1,0 +1,53 @@
+{
+  "lastScanTime": "2026-03-10T09:41:51.027Z",
+  "totalFiles": 7,
+  "folderCount": 1,
+  "mdFileCount": 2,
+  "pdfFileCount": 3,
+  "imageCount": 2,
+  "otherCount": 0,
+  "recentFiles": [
+    {
+      "name": "bert.jpg",
+      "path": "d:\\test_workspace\\机器学习\\深度学习\\Transformer\\bert.jpg",
+      "folder": "机器学习",
+      "addedTime": "2026-03-10T09:41:34.163Z",
+      "size": 0
+    },
+    {
+      "name": "attention.pdf",
+      "path": "d:\\test_workspace\\机器学习\\深度学习\\Transformer\\attention.pdf",
+      "folder": "机器学习",
+      "addedTime": "2026-03-10T09:41:34.160Z",
+      "size": 0
+    },
+    {
+      "name": "dl_paper.pdf",
+      "path": "d:\\test_workspace\\机器学习\\深度学习\\dl_paper.pdf",
+      "folder": "机器学习",
+      "addedTime": "2026-03-10T09:41:34.159Z",
+      "size": 0
+    },
+    {
+      "name": "ml_notes.md",
+      "path": "d:\\test_workspace\\机器学习\\ml_notes.md",
+      "folder": "机器学习",
+      "addedTime": "2026-03-10T09:41:34.153Z",
+      "size": 0
+    },
+    {
+      "name": "image.jpg",
+      "path": "d:\\test_workspace\\机器学习\\image.jpg",
+      "folder": "机器学习",
+      "addedTime": "2026-03-10T09:38:12.016Z",
+      "size": 0
+    }
+  ],
+  "folders": [
+    {
+      "name": "机器学习",
+      "fileCount": 7,
+      "totalSize": 0
+    }
+  ]
+}

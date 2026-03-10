@@ -364,10 +364,19 @@ class WorkspaceScanner {
         };
 
         try {
+            console.log(`[WorkspaceScanner] 开始生成summary，工作区路径: ${this.currentWorkspace?.workspacePath}`);
+
             const topFolders = this.getActualFolders();
             summary.folderCount = topFolders.length;
 
+            console.log(`[WorkspaceScanner] 发现 ${topFolders.length} 个顶级文件夹:`, topFolders.map(f => f.name));
+
             const allFilesAcrossWorkspace = [];
+
+            // 首先统计工作区根目录下的文件
+            console.log(`[WorkspaceScanner] 统计工作区根目录: ${this.currentWorkspace.workspacePath}`);
+            const rootFiles = this.countFilesInDirectory(this.currentWorkspace.workspacePath, summary, allFilesAcrossWorkspace, 'root');
+            console.log(`[WorkspaceScanner] 根目录文件统计完成: ${rootFiles} 个文件`);
 
             for (const folder of topFolders) {
                 const folderPath = folder.path;
@@ -377,7 +386,10 @@ class WorkspaceScanner {
                     totalSize: 0
                 };
 
+                console.log(`[WorkspaceScanner] 统计文件夹: ${folder.name} (${folderPath})`);
+
                 if (fs.existsSync(folderPath)) {
+                    console.log(`[WorkspaceScanner] 文件夹存在，开始递归统计`);
                     // 递归统计该顶级文件夹下的所有文件
                     const countRecursive = (currentPath) => {
                         let items = [];
@@ -435,20 +447,93 @@ class WorkspaceScanner {
                     };
 
                     countRecursive(folderPath);
+                } else {
+                    console.warn(`[WorkspaceScanner] 文件夹不存在: ${folderPath}`);
                 }
 
                 summary.folders.push(folderInfo);
+                console.log(`[WorkspaceScanner] 文件夹 ${folder.name} 统计完成: ${folderInfo.fileCount} 个文件`);
             }
 
             // 全局按添加时间排序，取整个工作区最近5个文件
             allFilesAcrossWorkspace.sort((a, b) => new Date(b.addedTime) - new Date(a.addedTime));
             summary.recentFiles = allFilesAcrossWorkspace.slice(0, 5);
 
+            console.log(`[WorkspaceScanner] 最终统计结果:`, {
+                totalFiles: summary.totalFiles,
+                folderCount: summary.folderCount,
+                mdFileCount: summary.mdFileCount,
+                pdfFileCount: summary.pdfFileCount,
+                imageCount: summary.imageCount
+            });
+
             fs.writeFileSync(this.summaryFile, JSON.stringify(summary, null, 2), 'utf-8');
-            console.log(`[WorkspaceScanner] 已生成 summary.json`);
+            console.log(`[WorkspaceScanner] 已生成 summary.json: ${this.summaryFile}`);
         } catch (err) {
             console.error('[WorkspaceScanner] 生成 summary 失败:', err.message);
         }
+    }
+
+    /**
+     * 统计指定目录下的文件（不包含子文件夹）
+     * @param {string} dirPath - 目录路径
+     * @param {Object} summary - 统计对象
+     * @param {Array} allFilesAcrossWorkspace - 所有文件列表
+     * @param {string} folderName - 文件夹名称
+     * @returns {number} 文件数量
+     */
+    countFilesInDirectory(dirPath, summary, allFilesAcrossWorkspace, folderName) {
+        let fileCount = 0;
+
+        try {
+            const items = fs.readdirSync(dirPath, { withFileTypes: true });
+
+            for (const item of items) {
+                if (item.isFile()) {
+                    // 跳过JSON配置文件
+                    if (item.name.endsWith('.json')) continue;
+
+                    const filePath = path.join(dirPath, item.name);
+                    let stats;
+
+                    try {
+                        stats = fs.statSync(filePath);
+                    } catch (err) {
+                        console.warn(`[WorkspaceScanner] 读取文件信息失败: ${filePath}`, err.message);
+                        continue;
+                    }
+
+                    const ext = path.extname(item.name).toLowerCase().replace('.', '');
+
+                    summary.totalFiles++;
+                    fileCount++;
+
+                    // 统计文件类型
+                    if (['md', 'txt'].includes(ext)) {
+                        summary.mdFileCount++;
+                    } else if (ext === 'pdf') {
+                        summary.pdfFileCount++;
+                    } else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) {
+                        summary.imageCount++;
+                    } else {
+                        summary.otherCount++;
+                    }
+
+                    allFilesAcrossWorkspace.push({
+                        name: item.name,
+                        path: filePath,
+                        folder: folderName,
+                        addedTime: stats.birthtime.toISOString(),
+                        size: stats.size
+                    });
+                }
+                // 注意：这里不递归处理子文件夹，因为子文件夹会在后面的循环中单独处理
+            }
+        } catch (err) {
+            console.warn(`[WorkspaceScanner] 读取目录失败: ${dirPath}`, err.message);
+        }
+
+        return fileCount;
     }
 
     /**

@@ -41,6 +41,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setActive: (folderPath) => ipcRenderer.invoke('workspace:setActive', folderPath),
     clearActive: () => ipcRenderer.invoke('workspace:clearActive'),
     getActive: () => ipcRenderer.invoke('workspace:getActive'),
+    getStats: () => ipcRenderer.invoke('workspace:getStats'),
+    getCategoryDetail: (categoryName) => ipcRenderer.invoke('workspace:getCategoryDetail', categoryName),
+    onWorkspaceUpdated: (callback) => {
+      ipcRenderer.on('workspace:updated', (event, data) => callback(data));
+    },
   },
   
   // 文件操作

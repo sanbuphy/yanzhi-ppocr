@@ -1,0 +1,139 @@
+{
+  "folderName": "test",
+  "path": "D:\\论文阅读\\test",
+  "workspaceId": "workspace__7cf6eaa0",
+  "scanTime": "2026-03-10T09:54:07.564Z",
+  "files": [
+    {
+      "name": "2408.15787v1.pdf",
+      "type": "file",
+      "path": "2408.15787v1.pdf",
+      "format": "pdf",
+      "addedTime": "2026-03-02T11:39:06.317Z",
+      "modifiedTime": "2026-03-02T11:33:27.941Z",
+      "size": 1320748
+    },
+    {
+      "name": "2507.11210v3.pdf",
+      "type": "file",
+      "path": "2507.11210v3.pdf",
+      "format": "pdf",
+      "addedTime": "2026-03-02T11:39:06.286Z",
+      "modifiedTime": "2026-03-01T10:15:04.451Z",
+      "size": 878113
+    },
+    {
+      "name": "2511.14445v1.pdf",
+      "type": "file",
+      "path": "2511.14445v1.pdf",
+      "format": "pdf",
+      "addedTime": "2026-03-02T11:39:06.276Z",
+      "modifiedTime": "2026-03-01T10:16:27.620Z",
+      "size": 434693
+    },
+    {
+      "name": "2-范围综述报告规范（PRISMA-ScR）的解读_仇如霞.pdf",
+      "type": "file",
+      "path": "2-范围综述报告规范（PRISMA-ScR）的解读_仇如霞.pdf",
+      "format": "pdf",
+      "addedTime": "2026-02-27T01:43:41.065Z",
+      "modifiedTime": "2026-02-27T01:43:41.046Z",
+      "size": 1056467
+    },
+    {
+      "name": "1-机器学习在提高非自杀性自伤预测力中的应用：一项系统综述.pdf",
+      "type": "file",
+      "path": "1-机器学习在提高非自杀性自伤预测力中的应用：一项系统综述.pdf",
+      "format": "pdf",
+      "addedTime": "2026-02-26T12:59:58.217Z",
+      "modifiedTime": "2026-02-26T12:59:58.201Z",
+      "size": 1003802
+    },
+    {
+      "name": "4-Use of Artificial Intelligence in Adolescents' Mental Health Care Systematic Scoping Review of Current Applications and Future Directions.pdf",
+      "type": "file",
+      "path": "4-Use of Artificial Intelligence in Adolescents' Mental Health Care Systematic Scoping Review of Current Applications and Future Directions.pdf",
+      "format": "pdf",
+      "addedTime": "2026-02-26T12:05:44.836Z",
+      "modifiedTime": "2026-02-26T12:05:49.747Z",
+      "size": 538053
+    },
+    {
+      "name": "3-The Role of AI in Serious Games and Gamification for Health Scoping Review.pdf",
+      "type": "file",
+      "path": "3-The Role of AI in Serious Games and Gamification for Health Scoping Review.pdf",
+      "format": "pdf",
+      "addedTime": "2026-02-26T12:05:31.481Z",
+      "modifiedTime": "2026-02-26T12:05:36.993Z",
+      "size": 290815
+    }
+  ],
+  "children": [],
+  "totalFileCount": 7,
+  "fileCount": 7,
+  "allFiles": [
+    {
+      "name": "2408.15787v1.pdf",
+      "type": "file",
+      "path": "2408.15787v1.pdf",
+      "format": "pdf",
+      "addedTime": "2026-03-02T11:39:06.317Z",
+      "modifiedTime": "2026-03-02T11:33:27.941Z",
+      "size": 1320748
+    },
+    {
+      "name": "2507.11210v3.pdf",
+      "type": "file",
+      "path": "2507.11210v3.pdf",
+      "format": "pdf",
+      "addedTime": "2026-03-02T11:39:06.286Z",
+      "modifiedTime": "2026-03-01T10:15:04.451Z",
+      "size": 878113
+    },
+    {
+      "name": "2511.14445v1.pdf",
+      "type": "file",
+      "path": "2511.14445v1.pdf",
+      "format": "pdf",
+      "addedTime": "2026-03-02T11:39:06.276Z",
+      "modifiedTime": "2026-03-01T10:16:27.620Z",
+      "size": 434693
+    },
+    {
+      "name": "2-范围综述报告规范（PRISMA-ScR）的解读_仇如霞.pdf",
+      "type": "file",
+      "path": "2-范围综述报告规范（PRISMA-ScR）的解读_仇如霞.pdf",
+      "format": "pdf",
+      "addedTime": "2026-02-27T01:43:41.065Z",
+      "modifiedTime": "2026-02-27T01:43:41.046Z",
+      "size": 1056467
+    },
+    {
+      "name": "1-机器学习在提高非自杀性自伤预测力中的应用：一项系统综述.pdf",
+      "type": "file",
+      "path": "1-机器学习在提高非自杀性自伤预测力中的应用：一项系统综述.pdf",
+      "format": "pdf",
+      "addedTime": "2026-02-26T12:59:58.217Z",
+      "modifiedTime": "2026-02-26T12:59:58.201Z",
+      "size": 1003802
+    },
+    {
+      "name": "4-Use of Artificial Intelligence in Adolescents' Mental Health Care Systematic Scoping Review of Current Applications and Future Directions.pdf",
+      "type": "file",
+      "path": "4-Use of Artificial Intelligence in Adolescents' Mental Health Care Systematic Scoping Review of Current Applications and Future Directions.pdf",
+      "format": "pdf",
+      "addedTime": "2026-02-26T12:05:44.836Z",
+      "modifiedTime": "2026-02-26T12:05:49.747Z",
+      "size": 538053
+    },
+    {
+      "name": "3-The Role of AI in Serious Games and Gamification for Health Scoping Review.pdf",
+      "type": "file",
+      "path": "3-The Role of AI in Serious Games and Gamification for Health Scoping Review.pdf",
+      "format": "pdf",
+      "addedTime": "2026-02-26T12:05:31.481Z",
+      "modifiedTime": "2026-02-26T12:05:36.993Z",
+      "size": 290815
+    }
+  ]
+}

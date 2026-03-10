@@ -1,0 +1,68 @@
+{
+  "lastScanTime": "2026-03-10T09:54:07.565Z",
+  "totalFiles": 15,
+  "folderCount": 4,
+  "mdFileCount": 0,
+  "pdfFileCount": 12,
+  "imageCount": 1,
+  "otherCount": 2,
+  "recentFiles": [
+    {
+      "name": "【哲风壁纸】OceanAvenue-云彩.png",
+      "path": "D:\\论文阅读\\机器学习\\【哲风壁纸】OceanAvenue-云彩.png",
+      "folder": "机器学习",
+      "addedTime": "2026-03-10T09:45:19.178Z",
+      "size": 478224
+    },
+    {
+      "name": "心理科学进展综述润色V6.docx",
+      "path": "D:\\论文阅读\\心理科学进展综述润色V6.docx",
+      "folder": "root",
+      "addedTime": "2026-03-03T09:38:51.733Z",
+      "size": 2048286
+    },
+    {
+      "name": "3758871.3758900.pdf",
+      "path": "D:\\论文阅读\\机器学习\\3758871.3758900.pdf",
+      "folder": "机器学习",
+      "addedTime": "2026-03-02T11:39:06.323Z",
+      "size": 2709150
+    },
+    {
+      "name": "2408.15787v1.pdf",
+      "path": "D:\\论文阅读\\test\\2408.15787v1.pdf",
+      "folder": "test",
+      "addedTime": "2026-03-02T11:39:06.317Z",
+      "size": 1320748
+    },
+    {
+      "name": "34763-Article Text-38830-1-2-20250410.pdf",
+      "path": "D:\\论文阅读\\机器学习\\34763-Article Text-38830-1-2-20250410.pdf",
+      "folder": "机器学习",
+      "addedTime": "2026-03-02T11:39:06.312Z",
+      "size": 749075
+    }
+  ],
+  "folders": [
+    {
+      "name": "hello",
+      "fileCount": 0,
+      "totalSize": 0
+    },
+    {
+      "name": "test",
+      "fileCount": 7,
+      "totalSize": 5522691
+    },
+    {
+      "name": "大模型",
+      "fileCount": 2,
+      "totalSize": 1951495
+    },
+    {
+      "name": "机器学习",
+      "fileCount": 4,
+      "totalSize": 9167504
+    }
+  ]
+}

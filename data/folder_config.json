@@ -1,0 +1,16 @@
+{
+  "folders": [
+    {
+      "name": "测试文件夹",
+      "description": "为测试文件夹主题创建的知识文件夹",
+      "path": "d:/yanzhi/yanzhi/data\\测试文件夹",
+      "created_at": "2026-03-10T17:49:13.242409"
+    },
+    {
+      "name": "hello",
+      "description": "为hello主题创建的知识文件夹",
+      "path": "D:/论文阅读\\hello",
+      "created_at": "2026-03-10T17:50:56.573476"
+    }
+  ]
+}

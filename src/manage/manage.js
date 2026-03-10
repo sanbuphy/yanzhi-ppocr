@@ -2,6 +2,29 @@
 const tabs = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
+// 监听工作区更新事件
+if (window.electronAPI && window.electronAPI.onWorkspaceUpdated) {
+  window.electronAPI.onWorkspaceUpdated((data) => {
+    console.log('收到工作区更新通知:', data);
+    // 延迟一点时间确保数据已写入
+    setTimeout(() => {
+      // 刷新当前活跃tab的内容
+      const activeTab = document.querySelector('.tab-btn.active');
+      if (activeTab) {
+        const targetTab = activeTab.getAttribute('data-tab');
+        if (targetTab === 'overview') {
+          updateOverviewStats();
+        } else if (targetTab === 'category') {
+          renderCategories();
+        } else if (targetTab === 'items' && currentCategory) {
+          renderCategorySummary(currentCategory);
+          renderKnowledgeItems(currentCategory.id);
+        }
+      }
+    }, 1000); // 等待1秒确保扫描完成
+  });
+}
+
 tabs.forEach(tab => {
   tab.addEventListener('click', () => {
     const targetTab = tab.getAttribute('data-tab');
@@ -16,6 +39,12 @@ tabs.forEach(tab => {
     if (targetContent) {
       targetContent.classList.add('active');
       
+      // 当切换到概览tab时，更新统计信息
+      if (targetTab === 'overview') {
+        setTimeout(() => {
+          updateOverviewStats();
+        }, 50);
+      }
       // 当切换到分类管理tab时，确保渲染分类数据
       if (targetTab === 'category') {
         setTimeout(() => {
@@ -505,47 +534,29 @@ function renderItemsToElement(items, recentList) {
 // 分类数据
 let categories = [];
 
-// 获取分类数据（占位）
+// 获取分类数据（从工作区统计数据获取）
 async function fetchCategories() {
-  // TODO: 后续接入实际的数据接口
-  return [
-    {
-      id: 1,
-      name: '机器学习',
-      count: 15,
-      color: null // 没有颜色线
-    },
-    {
-      id: 2,
-      name: '深度学习',
-      count: 23,
-      color: '#4ade80' // 绿色
-    },
-    {
-      id: 3,
-      name: '深度学习',
-      count: 23,
-      color: null
-    },
-    {
-      id: 4,
-      name: '可视化',
-      count: 23,
-      color: '#fbbf24' // 黄色
-    },
-    {
-      id: 5,
-      name: '自然语言处理',
-      count: 18,
-      color: null
-    },
-    {
-      id: 6,
-      name: '计算机视觉',
-      count: 12,
-      color: '#4ade80' // 绿色
+  try {
+    const result = await window.electronAPI.workspace.getStats();
+    if (!result.success) {
+      console.warn('获取工作区统计失败:', result.error);
+      return [];
     }
-  ];
+
+    const stats = result.stats;
+    
+    // 将文件夹转换为分类格式
+    return stats.folders.map((folder, index) => ({
+      id: index + 1,
+      name: folder.name,
+      count: folder.fileCount || 0,
+      color: null, // 可以后续根据需要添加颜色逻辑
+      description: folder.description || ''
+    }));
+  } catch (error) {
+    console.error('获取分类数据失败:', error);
+    return [];
+  }
 }
 
 // 渲染分类卡片
@@ -642,88 +653,162 @@ function handleCategoryAction(action, categoryId) {
 
 // 获取知识条目数据（根据分类ID）
 async function fetchKnowledgeItems(categoryId) {
-  // TODO: 后续接入实际的数据接口
-  // 模拟数据，根据分类ID返回不同的知识条目
-  const allItems = [
-    {
-      id: 1,
-      categoryId: 1,
-      title: 'Affective Communication via Haptic Technology: A Usability Study of a Huggable Device with Older Adults',
-      authors: '2E Nunez, Z Radosz-Knawa, A Kołbasa, P Zguda, A Kamińska, T Kukier, M Hirokawa, K Suzuki, B Indurkhya',
-      conference: 'Social Robotics+ AI: 17th International Conference, ICSR+ AI 2025, Naples, Italy, September 10-12, 2025, Proceedings, Part 1',
-      date: '3 天前',
-      type: 'pdf',
-      icon: '../../img/file.png',
-      tags: ['NLP', 'Transformer'],
-      summary: 'This paper presents a comprehensive usability study exploring how older adults interact with haptic communication devices.'
-    },
-    {
-      id: 2,
-      categoryId: 1,
-      title: 'Deep Learning for Multimodal Data Analysis',
-      authors: 'John Smith, Jane Doe',
-      conference: 'International Conference on Machine Learning 2025',
-      date: '5 天前',
-      type: 'image',
-      icon: '../../img/picture.png',
-      tags: ['Deep Learning', 'Multimodal'],
-      summary: 'An in-depth analysis of deep learning techniques applied to multimodal datasets.'
-    },
-    {
-      id: 3,
-      categoryId: 1,
-      title: 'Neural Architecture Search for Efficient Edge Computing',
-      authors: 'C Zhang, Y Wang, H Li, X Chen',
-      conference: 'IEEE Transactions on Neural Networks and Learning Systems, 2025',
-      date: '7 天前',
-      type: 'pdf',
-      icon: '../../img/file.png',
-      tags: ['NAS', 'Edge Computing'],
-      summary: 'We present a novel neural architecture search method for edge computing environments.'
-    },
-    {
-      id: 4,
-      categoryId: 1,
-      title: '机器学习模型训练笔记',
-      authors: '用户笔记',
-      conference: '',
-      date: '10 天前',
-      type: 'note',
-      icon: '../../img/chat-bot.png',
-      tags: ['训练', '优化'],
-      summary: '记录了深度学习模型训练过程中的关键参数调整和优化方法。'
-    },
-    {
-      id: 5,
-      categoryId: 2,
-      title: 'Advanced Deep Learning Architectures',
-      authors: 'Alice Johnson, Bob Williams',
-      conference: 'NeurIPS 2025',
-      date: '2 天前',
-      type: 'pdf',
-      icon: '../../img/file.png',
-      tags: ['Deep Learning', 'Architecture'],
-      summary: 'Exploring advanced deep learning architectures for various applications.'
+  try {
+    // 根据分类ID找到分类名称
+    const category = categories.find(c => c.id === categoryId);
+    if (!category) {
+      console.warn('找不到分类:', categoryId);
+      return [];
     }
-  ];
+
+    // 获取分类详情
+    const result = await window.electronAPI.workspace.getCategoryDetail(category.name);
+    if (!result.success) {
+      console.warn('获取分类详情失败:', result.error);
+      return [];
+    }
+
+    // 将文件数据转换为知识条目格式
+    return result.files.map((file, index) => {
+      // 根据文件扩展名确定类型和图标
+      let type = 'file';
+      let icon = '../../img/file.png';
+      const ext = file.format?.toLowerCase() || '';
+
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) {
+        type = 'image';
+        icon = '../../img/picture.png';
+      } else if (ext === 'pdf') {
+        type = 'pdf';
+        icon = '../../img/file.png';
+      } else if (['md', 'txt'].includes(ext)) {
+        type = 'note';
+        icon = '../../img/chat-bot.png';
+      }
+
+      // 格式化日期
+      const addedTime = new Date(file.addedTime);
+      const now = new Date();
+      const diffTime = Math.abs(now - addedTime);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const dateText = diffDays === 1 ? '1 天前' : `${diffDays} 天前`;
+
+      return {
+        id: index + 1,
+        categoryId: categoryId,
+        title: file.name,
+        authors: '未知作者', // 文件没有作者信息
+        conference: '', // 文件没有会议信息
+        date: dateText,
+        type: type,
+        icon: icon,
+        tags: [ext.toUpperCase() || 'FILE'], // 使用文件扩展名作为标签
+        summary: `文件大小: ${formatFileSize(file.size)} | 添加时间: ${addedTime.toLocaleDateString()}`,
+        filePath: file.path,
+        addedTime: file.addedTime,
+        size: file.size
+      };
+    });
+  } catch (error) {
+    console.error('获取知识条目失败:', error);
+    return [];
+  }
+}
+
+// 更新概览页面统计信息
+async function updateOverviewStats() {
+  try {
+    const result = await window.electronAPI.workspace.getStats();
+    if (!result.success) {
+      console.warn('获取工作区统计失败:', result.error);
+      return;
+    }
+
+    const stats = result.stats;
+    
+    // 更新统计卡片
+    document.getElementById('statTotalValue').textContent = stats.totalFiles || 0;
+    document.getElementById('statCategoryValue').textContent = stats.folderCount || 0;
+    document.getElementById('statNotesValue').textContent = stats.mdFileCount || 0;
+    document.getElementById('statImagesValue').textContent = stats.imageCount || 0;
+    
+    // 更新最近添加的项目
+    updateRecentItems(stats.recentFiles || []);
+    
+    console.log('概览统计已更新:', stats);
+  } catch (error) {
+    console.error('更新概览统计失败:', error);
+  }
+}
+
+// 更新最近添加的项目列表
+function updateRecentItems(recentFiles) {
+  const recentItemsList = document.getElementById('recentItemsList');
+  if (!recentItemsList) return;
   
-  // 根据分类ID过滤
-  return allItems.filter(item => item.categoryId === categoryId);
+  if (!recentFiles || recentFiles.length === 0) {
+    recentItemsList.innerHTML = '<div style="color: #888; text-align: center; padding: 20px;">暂无最近添加的项目</div>';
+    return;
+  }
+  
+  recentItemsList.innerHTML = recentFiles.map(file => {
+    // 根据文件扩展名确定图标
+    let icon = '../../img/file.png';
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+      icon = '../../img/picture.png';
+    } else if (ext === 'pdf') {
+      icon = '../../img/file.png';
+    } else if (['md', 'txt'].includes(ext)) {
+      icon = '../../img/chat-bot.png';
+    }
+    
+    // 格式化添加时间
+    const addedTime = new Date(file.addedTime);
+    const timeText = addedTime.toLocaleDateString();
+    
+    return `
+      <div class="recent-item">
+        <img src="${icon}" alt="${ext}" class="recent-item-icon" />
+        <div class="recent-item-content">
+          <div class="recent-item-title">${file.name}</div>
+          <div class="recent-item-meta">${file.folder} • ${timeText}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 // 渲染分类摘要
-function renderCategorySummary(category) {
-  // 更新分类名称和条目数量
-  document.getElementById('categoryItemCount').textContent = `${category.count}个知识条目`;
-  document.getElementById('categoryName').textContent = category.name;
-  document.getElementById('knowledgeItemsTitle').textContent = `知识条目分类管理: ${category.name}`;
-  
-  // 计算文档和图片数量（模拟数据，后续接入实际计算）
-  const docCount = Math.floor(category.count * 0.65); // 假设65%是文档
-  const imageCount = category.count - docCount;
-  
-  document.getElementById('categoryDocCount').textContent = docCount;
-  document.getElementById('categoryImageCount').textContent = imageCount;
+async function renderCategorySummary(category) {
+  try {
+    // 更新分类名称和条目数量
+    document.getElementById('categoryItemCount').textContent = `${category.count}个知识条目`;
+    document.getElementById('categoryName').textContent = category.name;
+    document.getElementById('knowledgeItemsTitle').textContent = `知识条目分类管理: ${category.name}`;
+    
+    // 获取工作区统计数据
+    const statsResult = await window.electronAPI.workspace.getStats();
+    if (statsResult.success) {
+      const stats = statsResult.stats;
+      
+      // 显示统计信息
+      document.getElementById('categoryDocCount').textContent = stats.mdFileCount || 0;
+      document.getElementById('categoryImageCount').textContent = stats.imageCount || 0;
+      
+      // 可以在页面上添加更多统计信息显示
+      console.log('工作区统计:', stats);
+    } else {
+      // 如果获取失败，使用默认值
+      document.getElementById('categoryDocCount').textContent = '0';
+      document.getElementById('categoryImageCount').textContent = '0';
+    }
+  } catch (error) {
+    console.error('渲染分类摘要失败:', error);
+    document.getElementById('categoryDocCount').textContent = '0';
+    document.getElementById('categoryImageCount').textContent = '0';
+  }
 }
 
 // 渲染知识条目列表
@@ -857,6 +942,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // 延迟渲染最近添加，确保DOM完全加载
   setTimeout(() => {
+    updateOverviewStats(); // 更新概览统计信息
     renderRecentItems();
     renderCategories();
   }, 100);
@@ -940,5 +1026,13 @@ function setupNavigation() {
   } else {
     console.warn('找不到 navManage 元素');
   }
+}
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
 }
 

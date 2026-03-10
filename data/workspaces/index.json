@@ -1,8 +1,9 @@
 {
   "version": 1,
-  "updatedAt": "2026-03-09T15:37:12.864Z",
+  "updatedAt": "2026-03-10T09:54:07.551Z",
   "pathToWorkspaceId": {
-    "d:/code/yanzhi/yanzhi2": "yanzhi2__fc67d5c4",
-    "d:/code/yanzhi/data": "data__21e8ed42"
+    "d:/论文阅读": "workspace__7cf6eaa0",
+    "d:/日内瓦申请": "workspace__78e2eb7e",
+    "d:/test_workspace": "test_workspace__ee13fd80"
   }
 }
