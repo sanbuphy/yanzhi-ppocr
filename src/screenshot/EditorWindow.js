@@ -8,7 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const { AIClient } = require('./aiClient');
 
-const IMAGE_EXPLANATION_TIMEOUT_MS = 20000;
+const IMAGE_EXPLANATION_TIMEOUT_MS = 60000; // 60 秒超时
 const AI_TIMEOUT_TEXT = 'AI请求超时';
 
 class EditorWindow {
@@ -37,8 +37,26 @@ class EditorWindow {
         // 编辑舞台四周留暗区，保持被编辑区域与背景区分
         const toolbarHeight = 64;
         const stagePadding = 28;
-        const winHeight = Math.max(height + stagePadding * 2 + toolbarHeight, 500);
-        const winWidth = Math.max(width + stagePadding * 2, 920);
+        const dragbarHeight = 34;
+        
+        // 计算最大可用空间（屏幕的 85%）
+        const maxAvailableWidth = Math.floor(screenW * 0.85);
+        const maxAvailableHeight = Math.floor(screenH * 0.85);
+        
+        // 计算窗口大小，确保图片能够完整显示（可能需要缩放）
+        const maxImageWidth = maxAvailableWidth - stagePadding * 2;
+        const maxImageHeight = maxAvailableHeight - stagePadding * 2 - toolbarHeight - dragbarHeight;
+        
+        // 计算缩放比例
+        const scaleX = maxImageWidth / width;
+        const scaleY = maxImageHeight / height;
+        const scale = Math.min(1, scaleX, scaleY); // 不放大，只缩小
+        
+        const displayWidth = Math.ceil(width * scale);
+        const displayHeight = Math.ceil(height * scale);
+        
+        const winHeight = Math.max(displayHeight + stagePadding * 2 + toolbarHeight + dragbarHeight, 500);
+        const winWidth = Math.max(displayWidth + stagePadding * 2, 920);
 
         let winX = selection.x - stagePadding;
         let winY = selection.y - stagePadding;
@@ -47,8 +65,8 @@ class EditorWindow {
         winY = Math.max(0, Math.min(winY, Math.max(0, screenH - winHeight)));
 
         this.window = new BrowserWindow({
-            width: winWidth,
-            height: winHeight,
+            width: Math.min(winWidth, screenW),
+            height: Math.min(winHeight, screenH),
             x: winX,
             y: winY,
             frame: false,
@@ -136,7 +154,7 @@ class EditorWindow {
                 ? (explanation.finalAnswer || '')
                 : (explanation || '');
             const result = await this.saveToKnowledgeBase(base64, explanationText);
-            this.close();
+            // 不在这里关闭窗口，让前端显示 Toast 后再关闭
             return { explanation, result };
         });
 
@@ -238,11 +256,60 @@ class EditorWindow {
     }
 
     /**
+     * 获取 Python 可执行文件路径
+     */
+    _getPythonPath() {
+        const { execSync } = require('child_process');
+        // 常见的 Python 路径
+        const candidates = [
+            '/usr/local/bin/python3',
+            '/usr/bin/python3',
+            '/opt/homebrew/bin/python3',
+            '/Library/Frameworks/Python.framework/Versions/3.10/bin/python3',
+            '/Library/Frameworks/Python.framework/Versions/3.11/bin/python3',
+            '/Library/Frameworks/Python.framework/Versions/3.12/bin/python3',
+            'python3',
+            'python'
+        ];
+        
+        // 尝试使用 which 命令查找
+        try {
+            const result = execSync('which python3 2>/dev/null || which python 2>/dev/null', {
+                encoding: 'utf-8',
+                timeout: 5000,
+                shell: '/bin/zsh'
+            }).trim();
+            if (result && fs.existsSync(result)) {
+                return result;
+            }
+        } catch (e) {
+            // which 命令失败，继续尝试候选路径
+        }
+        
+        // 遍历候选路径
+        for (const candidate of candidates) {
+            if (fs.existsSync(candidate)) {
+                return candidate;
+            }
+        }
+        
+        throw new Error('未找到 Python 解释器，请安装 Python3');
+    }
+
+    /**
      * 调用 Python 分类器
      */
     async callPythonClassifier(imagePath, explanation) {
         const { spawn } = require('child_process');
         const toolsDir = path.join(__dirname, '../../tools');
+        
+        // 获取 Python 路径
+        let pythonPath;
+        try {
+            pythonPath = this._getPythonPath();
+        } catch (e) {
+            return { success: false, error: e.message };
+        }
 
         return new Promise((resolve, reject) => {
             const pythonCode = `
@@ -265,7 +332,7 @@ except Exception as e:
     print("RESULT:" + json.dumps({"success": False, "error": str(e)}))
 `;
 
-            const proc = spawn('python', ['-c', pythonCode], {
+            const proc = spawn(pythonPath, ['-c', pythonCode], {
                 cwd: toolsDir,
                 env: {
                     ...process.env,

@@ -223,6 +223,23 @@ async function openFolder() {
     currentFolderPath = folderPath;
     console.log('设置当前文件夹路径为:', currentFolderPath);
 
+    // 清空中间展示区域
+    const displayArea = document.getElementById('displayArea');
+    if (displayArea) {
+      displayArea.innerHTML = `
+        <div class="empty-state">
+          <img src="../../img/Folder.png" alt="Folder" class="empty-icon" />
+          <p>选择一个文件内容进行查看</p>
+        </div>
+      `;
+    }
+
+    // 清空右侧对话区域
+    const chatMessages = document.getElementById('chatMessages');
+    if (chatMessages) {
+      chatMessages.innerHTML = '';
+    }
+
     // 读取文件夹内容
     const readResult = await window.electronAPI.folder.read(folderPath);
     if (!readResult.success) {

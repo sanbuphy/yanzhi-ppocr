@@ -85,14 +85,14 @@ class AIClient {
             this.isVLM = true;
             console.log(`✅ 使用 GitHub Models: ${this.modelName}`);
         } else if (siliconToken) {
-            // 使用 SiliconFlow (Qwen2.5 是纯文本，需要 OCR 辅助)
+            // 使用 SiliconFlow (Qwen2.5-7B-Instruct 免费模型)
             this.client = new OpenAI({
                 baseURL: 'https://api.siliconflow.cn/v1',
                 apiKey: siliconToken
             });
             this.modelName = 'Qwen/Qwen2.5-7B-Instruct';
             this.isVLM = false;
-            console.log(`✅ 使用 SiliconFlow: ${this.modelName} (需要 OCR 辅助处理图片)`);
+            console.log(`✅ 使用 SiliconFlow: ${this.modelName}`);
         } else {
             throw new Error('请设置环境变量：GITHUB_TOKEN 或 SILICONFLOW_API_KEY');
         }

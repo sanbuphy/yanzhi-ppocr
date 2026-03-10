@@ -1,0 +1,49 @@
+{
+  "folderName": "机器学习",
+  "path": "/Users/nnnnm/Desktop/yanzhi-test/机器学习",
+  "workspaceId": "yanzhi-test__aaa15a94",
+  "scanTime": "2026-03-10T10:58:37.325Z",
+  "files": [
+    {
+      "name": "screenshot_20260310_175828.txt",
+      "type": "file",
+      "path": "screenshot_20260310_175828.txt",
+      "format": "txt",
+      "addedTime": "2026-03-10T09:58:28.574Z",
+      "modifiedTime": "2026-03-10T09:58:28.574Z",
+      "size": 2902
+    },
+    {
+      "name": "screenshot_20260310_175828.png",
+      "type": "file",
+      "path": "screenshot_20260310_175828.png",
+      "format": "png",
+      "addedTime": "2026-03-10T09:58:28.354Z",
+      "modifiedTime": "2026-03-10T09:58:28.573Z",
+      "size": 460422
+    }
+  ],
+  "children": [],
+  "totalFileCount": 2,
+  "fileCount": 2,
+  "allFiles": [
+    {
+      "name": "screenshot_20260310_175828.txt",
+      "type": "file",
+      "path": "screenshot_20260310_175828.txt",
+      "format": "txt",
+      "addedTime": "2026-03-10T09:58:28.574Z",
+      "modifiedTime": "2026-03-10T09:58:28.574Z",
+      "size": 2902
+    },
+    {
+      "name": "screenshot_20260310_175828.png",
+      "type": "file",
+      "path": "screenshot_20260310_175828.png",
+      "format": "png",
+      "addedTime": "2026-03-10T09:58:28.354Z",
+      "modifiedTime": "2026-03-10T09:58:28.573Z",
+      "size": 460422
+    }
+  ]
+}

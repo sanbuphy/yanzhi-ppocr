@@ -55,7 +55,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: auto;
+            overflow: hidden;
             -webkit-app-region: no-drag;
         }
 
@@ -64,6 +64,11 @@
             border: 1px solid #303030;
             box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
             background: #1e1e1e;
+            max-width: 100%;
+            max-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         #base-canvas {
@@ -71,6 +76,9 @@
             background: #2f2f2f;
             position: relative;
             z-index: 1;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
         }
 
         #draw-canvas {
@@ -373,6 +381,69 @@
         #result-close-x:hover {
             color: #fff;
         }
+
+        /* Toast 通知样式 */
+        #toast-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 3000;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: rgba(0, 0, 0, 0.88);
+            color: #fff;
+            padding: 20px 32px;
+            border-radius: 12px;
+            font-size: 16px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            animation: toastFadeInOut 2s ease-in-out forwards;
+            max-width: 80vw;
+            word-break: break-word;
+        }
+
+        .toast.success {
+            background: rgba(46, 125, 50, 0.95);
+            border-color: rgba(76, 175, 80, 0.3);
+        }
+
+        .toast.error {
+            background: rgba(198, 40, 40, 0.95);
+            border-color: rgba(244, 67, 54, 0.3);
+        }
+
+        .toast .icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .toast .message {
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        @keyframes toastFadeInOut {
+            0% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            15% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            85% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+        }
     </style>
 </head>
 <body>
@@ -424,6 +495,8 @@
 
     <div id="loading"><span>AI 正在处理中...</span></div>
 
+    <div id="toast-container"></div>
+
     <div id="result-modal">
         <div id="result-backdrop"></div>
         <div id="result-panel">
@@ -471,6 +544,7 @@
         let isDraggingResultPanel = false;
         let dragPanelOffsetX = 0;
         let dragPanelOffsetY = 0;
+        let canvasScale = 1; // 画布缩放比例
         const DEBUG_TEXT_TOOL = true;
 
         function logTextTool(message, extra = null) {
@@ -741,17 +815,21 @@
         function createTextInput(x, y) {
             commitActiveTextInput();
 
+            // 将画布坐标转换为显示坐标
+            const displayX = x * canvasScale;
+            const displayY = y * canvasScale;
+            
             const input = document.createElement('input');
             input.type = 'text';
             input.className = 'text-input';
-            input.style.left = `${x}px`;
-            input.style.top = `${y}px`;
+            input.style.left = `${displayX}px`;
+            input.style.top = `${displayY}px`;
             input.style.minWidth = '180px';
-            input.style.height = `${Math.max(26, lineWidth * 6)}px`;
+            input.style.height = `${Math.max(26, lineWidth * 6) * canvasScale}px`;
             input.style.color = currentColor;
-            input.style.fontSize = `${Math.max(14, lineWidth * 6)}px`;
+            input.style.fontSize = `${Math.max(14, lineWidth * 6) * canvasScale}px`;
             input.placeholder = '输入文字后按 Enter';
-            input.dataset.x = String(x);
+            input.dataset.x = String(x); // 保存原始画布坐标
             input.dataset.y = String(y);
             input.dataset.color = currentColor;
             input.dataset.size = String(Math.max(14, lineWidth * 6));
@@ -797,19 +875,45 @@
                 return;
             }
 
-            const size = Math.max(8, lineWidth * 2);
+            // 将画布坐标转换为显示坐标
+            const displayX = x * canvasScale;
+            const displayY = y * canvasScale;
+            const size = Math.max(8, lineWidth * 2) * canvasScale;
             eraserCursor.style.width = `${size}px`;
             eraserCursor.style.height = `${size}px`;
-            eraserCursor.style.left = `${x}px`;
-            eraserCursor.style.top = `${y}px`;
+            eraserCursor.style.left = `${displayX}px`;
+            eraserCursor.style.top = `${displayY}px`;
         }
 
         ipcRenderer.on('editor:image', (event, dataUrl) => {
             img.onload = () => {
+                // 设置实际画布尺寸（原始图片尺寸）
                 baseCanvas.width = img.width;
                 baseCanvas.height = img.height;
                 drawCanvas.width = img.width;
                 drawCanvas.height = img.height;
+                
+                // 计算显示缩放比例
+                const stage = document.getElementById('stage');
+                const stageRect = stage.getBoundingClientRect();
+                const maxDisplayWidth = stageRect.width - 44; // 减去 padding
+                const maxDisplayHeight = stageRect.height - 44;
+                
+                const scaleX = maxDisplayWidth / img.width;
+                const scaleY = maxDisplayHeight / img.height;
+                canvasScale = Math.min(1, scaleX, scaleY); // 不放大，只缩小
+                
+                // 设置 CSS 显示尺寸
+                const displayWidth = Math.ceil(img.width * canvasScale);
+                const displayHeight = Math.ceil(img.height * canvasScale);
+                
+                baseCanvas.style.width = `${displayWidth}px`;
+                baseCanvas.style.height = `${displayHeight}px`;
+                drawCanvas.style.width = `${displayWidth}px`;
+                drawCanvas.style.height = `${displayHeight}px`;
+                canvasShell.style.width = `${displayWidth}px`;
+                canvasShell.style.height = `${displayHeight}px`;
+                
                 baseCtx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
                 ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
                 baseCtx.drawImage(img, 0, 0);
@@ -849,8 +953,9 @@
 
         function getCanvasPoint(e) {
             const rect = drawCanvas.getBoundingClientRect();
-            const x = Math.round(e.clientX - rect.left);
-            const y = Math.round(e.clientY - rect.top);
+            // 根据缩放比例转换鼠标坐标到实际画布坐标
+            const x = Math.round((e.clientX - rect.left) / canvasScale);
+            const y = Math.round((e.clientY - rect.top) / canvasScale);
             return {
                 x: Math.max(0, Math.min(x, drawCanvas.width)),
                 y: Math.max(0, Math.min(y, drawCanvas.height))
@@ -947,6 +1052,32 @@
             }
         });
 
+        function showToast(message, type = 'success', duration = 1800) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icon = type === 'success' ? '✓' : '✗';
+            toast.innerHTML = `
+                <div class="icon">${icon}</div>
+                <div class="message">${message}</div>
+            `;
+            
+            container.innerHTML = '';
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, duration);
+        }
+
+        function extractFolderName(filePath) {
+            if (!filePath) return '未知文件夹';
+            const parts = filePath.split(/[\\/]/);
+            // 返回倒数第二个部分（文件夹名）
+            return parts.length >= 2 ? parts[parts.length - 2] : '根目录';
+        }
+
         document.getElementById('ai-save-btn').addEventListener('click', async () => {
             commitActiveTextInput();
             setLoading(true);
@@ -954,19 +1085,20 @@
                 const payload = await ipcRenderer.invoke('editor:explain-and-save', getCanvasDataUrl());
                 const result = payload && payload.result ? payload.result : null;
                 if (result && result.success) {
-                    const meta = `保存路径:\n${result.path}`;
-                    if (payload && payload.explanation && typeof payload.explanation === 'object') {
-                        showAiAuditModal('解读并入库成功', payload.explanation, meta);
-                    } else {
-                        showResultModal('解读并入库成功', `${meta}\n\nAI 解读:\n${payload.explanation || '无'}`);
-                    }
+                    const folderName = extractFolderName(result.path);
+                    setLoading(false);
+                    showToast(`已将图片存入「${folderName}」文件夹`, 'success', 1800);
+                    // 1.8秒后自动关闭窗口
+                    setTimeout(() => {
+                        ipcRenderer.send('editor:cancel');
+                    }, 1800);
                 } else {
-                    showResultModal('入库失败', result ? result.error : '未知错误', { hideCopy: true });
+                    setLoading(false);
+                    showToast(result ? result.error : '入库失败', 'error', 2000);
                 }
             } catch (error) {
-                showResultModal('解读并入库失败', error.message || String(error), { hideCopy: true });
-            } finally {
                 setLoading(false);
+                showToast(error.message || '解读并入库失败', 'error', 2000);
             }
         });
 
