@@ -1586,7 +1586,7 @@ function setupEventListeners() {
         const ext = getFileExtension(file.name);
         const fileObj = {
           name: file.name,
-          path: null,
+          path: file.path || null,
           file: file,
           url: URL.createObjectURL(file),
           fileType: getFileType(ext)
@@ -1624,7 +1624,7 @@ function setupEventListeners() {
           const ext = getFileExtension(file.name);
           const fileObj = {
             name: file.name,
-            path: null,
+            path: file.path || null,
             file: file,
             url: URL.createObjectURL(file),
             fileType: getFileType(ext)
@@ -1819,6 +1819,9 @@ async function displayFile(file, ext) {
     url: file.path ? null : URL.createObjectURL(file),
     fileType: fileType
   };
+  
+  // 更新当前文件状态，确保 Agent 能获取到上下文
+  currentFile = fileObj;
 
   try {
     if (fileType === 'image') {
@@ -1916,15 +1919,30 @@ async function sendMessage() {
 // 调用 AI API
 async function callAI(userQuery) {
   try {
+    // 准备 Agent 上下文
+    let agentContent = null;
+    let agentContentType = 'text';
+
+    if (currentFile) {
+        agentContent = currentFile.path || null;
+        agentContentType = currentFile.fileType || 'text';
+    } else if (attachedFiles.length > 0) {
+        const lastAttach = attachedFiles[attachedFiles.length - 1];
+        agentContent = lastAttach.path || null;
+        agentContentType = lastAttach.fileType || 'text';
+    }
+
     // 1. 先尝试通过 Agent 处理（智能意图识别）
     const agentResult = await window.electronAPI.agent.process(userQuery, {
-      content: currentFile ? currentFile.path : null,
-      contentType: currentFile?.fileType || 'text'
+      content: agentContent,
+      contentType: agentContentType
     });
 
     if (agentResult.success && agentResult.skill) {
       removeLoadingMessage();
       addAIMessage(formatAgentResult(agentResult));
+      // 处理成功后清空附件
+      clearAttachments();
       return;
     }
 
@@ -2098,17 +2116,19 @@ function renderMessage(message) {
   const avatar = document.createElement('div');
   avatar.className = 'message-avatar';
   const avatarImg = document.createElement('img');
-  avatarImg.src = message.type === 'user' ? '../../img/user.png' : '../../img/robot.png';
+  if (message.type === 'user') {
+    const savedAvatar = localStorage.getItem('profilePicture');
+    avatarImg.src = savedAvatar || '../../img/user.png';
+  } else {
+    avatarImg.src = '../../img/robot.png';
+  }
   avatar.appendChild(avatarImg);
   
   const content = document.createElement('div');
   content.className = 'message-content';
   
-  // Convert text to HTML with line breaks and formatting
-  let html = message.text.replace(/\n/g, '<br>');
-  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/(\d+)\.\s/g, '<strong>$1.</strong> ');
-  content.innerHTML = html;
+  // 使用更强大的全局 renderMarkdown 函数
+  content.innerHTML = renderMarkdown(message.text);
   
   const time = document.createElement('div');
   time.className = 'message-time';

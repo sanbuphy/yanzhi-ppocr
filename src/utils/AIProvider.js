@@ -25,7 +25,17 @@ class PDFReader {
      */
     _initPdfParse() {
         try {
-            this.pdfParse = require('pdf-parse');
+            const pdf = require('pdf-parse');
+            // 处理不同版本的导出格式 (有些版本导出函数，有些版本导出对象包含 PDFParse)
+            if (typeof pdf === 'function') {
+                this.pdfParse = pdf;
+            } else if (pdf && typeof pdf.PDFParse === 'function') {
+                this.pdfParse = pdf.PDFParse;
+            } else if (pdf && pdf.default && typeof pdf.default === 'function') {
+                this.pdfParse = pdf.default;
+            } else {
+                console.warn('⚠️ pdf-parse 导出格式异常:', typeof pdf);
+            }
         } catch (e) {
             console.warn('⚠️ pdf-parse 未安装，PDF 读取功能将不可用');
             console.warn('   请运行：npm install pdf-parse');
@@ -49,10 +59,31 @@ class PDFReader {
             }
 
             const pdfBuffer = fs.readFileSync(filePath);
-            const doc = await this.pdfParse(pdfBuffer);
+            
+            let fullText = '';
+            let totalPages = 0;
 
-            const totalPages = doc.numpages;
-            const fullText = doc.text;
+            // 检测是 v2 类风格还是 v1 函数风格
+            if (this.pdfParse.prototype && typeof this.pdfParse.prototype.load === 'function') {
+                // 新版 v2 风格 (Mehmet Kozan 版)
+                const doc = new this.pdfParse(new Uint8Array(pdfBuffer));
+                await doc.load();
+                const textResult = await doc.getText();
+                // v2 返回的是对象 { text, pages, total }
+                fullText = (typeof textResult === 'object') ? (textResult.text || '') : textResult;
+                const info = await doc.getInfo();
+                // v2 的页数通常在 info.total 中
+                totalPages = info.total || (info.pages ? info.pages.length : 0);
+            } else {
+                // 旧版 v1 风格
+                const doc = await this.pdfParse(pdfBuffer);
+                fullText = doc.text;
+                totalPages = doc.numpages;
+            }
+
+            if (!fullText) {
+                return { success: false, error: '未能从 PDF 中提取出文本内容' };
+            }
 
             // 简单分页处理
             const lines = fullText.split('\n');
@@ -87,11 +118,21 @@ class PDFReader {
         // 这里提供一个简化版本，如果 pdf-parse 无法提取文本则调用 VLM
         try {
             const pdfBuffer = fs.readFileSync(filePath);
-            const pdfParse = require('pdf-parse');
-            const doc = await pdfParse(pdfBuffer);
+            
+            let fullText = '';
+            if (this.pdfParse.prototype && typeof this.pdfParse.prototype.load === 'function') {
+                const doc = new this.pdfParse(new Uint8Array(pdfBuffer));
+                await doc.load();
+                const textResult = await doc.getText();
+                // v2 返回的是对象 { text, pages, total }
+                fullText = (typeof textResult === 'object') ? (textResult.text || '') : textResult;
+            } else {
+                const doc = await this.pdfParse(pdfBuffer);
+                fullText = doc.text;
+            }
 
-            if (doc.text.trim()) {
-                return doc.text;
+            if (fullText && fullText.trim()) {
+                return fullText;
             }
 
             // 如果没有文本，提示用户使用其他方式
@@ -166,12 +207,23 @@ class ArxivClient {
             }
 
             // 提取链接（PDF URL）
-            const pdfLinkMatch = entry.match(/<link[^>]+title="pdf"[^>]+href="([^"]+)"/);
+            // 更加健壮的正则表达式，不依赖属性顺序
+            const pdfLinkMatch = entry.match(/<link[^>]*href="([^"]+)"[^>]*title="pdf"[^>]*\/>/) || 
+                                entry.match(/<link[^>]*title="pdf"[^>]*href="([^"]+)"[^>]*\/>/) ||
+                                entry.match(/<link[^>]*href="([^"]+)"[^>]*type="application\/pdf"[^>]*\/>/);
             const pdfUrl = pdfLinkMatch ? pdfLinkMatch[1] : null;
 
             // 提取 arxiv ID
-            const idMatch = entry.match(/<id>arxiv:([^<]+)<\/id>/);
-            const arxivId = idMatch ? idMatch[1] : null;
+            const idMatch = entry.match(/<id>([^<]+)<\/id>/);
+            let arxivId = null;
+            if (idMatch) {
+                const idContent = idMatch[1];
+                if (idContent.includes('/abs/')) {
+                    arxivId = idContent.split('/abs/')[1];
+                } else if (idContent.includes('arxiv:')) {
+                    arxivId = idContent.split('arxiv:')[1];
+                }
+            }
 
             // 提取提交日期
             const publishedMatch = entry.match(/<published>([^<]+)<\/published>/);

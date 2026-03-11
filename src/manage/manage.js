@@ -661,8 +661,8 @@ async function fetchKnowledgeItems(categoryId) {
       return [];
     }
 
-    // 获取分类详情
-    const result = await window.electronAPI.workspace.getCategoryDetail(category.name);
+    // 获取分类详情 (优先使用 detailFile 避免同名文件夹冲突)
+    const result = await window.electronAPI.workspace.getCategoryDetail(category.detailFile || category.name);
     if (!result.success) {
       console.warn('获取分类详情失败:', result.error);
       return [];

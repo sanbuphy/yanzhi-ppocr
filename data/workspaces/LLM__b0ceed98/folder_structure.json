@@ -1,0 +1,26 @@
+{
+  "folders": [
+    {
+      "name": "images",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\images",
+      "description": "存放各种图片文件。"
+    },
+    {
+      "name": "博客",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\博客",
+      "description": "存放个人或团队的各类博客文章、日志和文章素材。"
+    },
+    {
+      "name": "文章",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\文章",
+      "description": "存放各类文章文档，如新闻、故事、论文等。"
+    }
+  ],
+  "lastUpdated": "2026-03-11T05:17:00.023Z",
+  "addedFolders": [
+    "images",
+    "博客",
+    "文章"
+  ],
+  "removedFolders": []
+}

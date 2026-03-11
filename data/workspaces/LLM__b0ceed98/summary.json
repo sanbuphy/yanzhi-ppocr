@@ -1,0 +1,61 @@
+{
+  "lastScanTime": "2026-03-11T05:17:00.032Z",
+  "totalFiles": 4,
+  "folderCount": 3,
+  "mdFileCount": 1,
+  "pdfFileCount": 2,
+  "imageCount": 1,
+  "otherCount": 0,
+  "monthlyNewFiles": 0,
+  "monthlyNewNotes": 0,
+  "monthlyNewImages": 0,
+  "recentFiles": [
+    {
+      "name": "NavAI_ A Generalizable LLM Framework for Navigation Tasks in Virtual Reality Environments.pdf",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\文章\\NavAI_ A Generalizable LLM Framework for Navigation Tasks in Virtual Reality Environments.pdf",
+      "folder": "文章",
+      "addedTime": "2026-01-07T15:22:29.071Z",
+      "size": 998364
+    },
+    {
+      "name": "一文搞懂LLM大模型！LLM从入门到精通万字长文（2024.12月最新）_llm模型-CSDN博客_224255.pdf",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\博客\\一文搞懂LLM大模型！LLM从入门到精通万字长文（2024.12月最新）_llm模型-CSDN博客_224255.pdf",
+      "folder": "博客",
+      "addedTime": "2026-01-07T14:43:06.871Z",
+      "size": 6085691
+    },
+    {
+      "name": "image_20260107_223709.png",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\images\\image_20260107_223709.png",
+      "folder": "images",
+      "addedTime": "2026-01-07T14:37:09.209Z",
+      "size": 69993
+    },
+    {
+      "name": "LLM.md",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\LLM.md",
+      "folder": "root",
+      "addedTime": "2026-01-05T12:07:18.022Z",
+      "size": 14870,
+      "ext": "md"
+    }
+  ],
+  "recentMonthFiles": [],
+  "folders": [
+    {
+      "name": "images",
+      "fileCount": 1,
+      "totalSize": 69993
+    },
+    {
+      "name": "博客",
+      "fileCount": 1,
+      "totalSize": 6085691
+    },
+    {
+      "name": "文章",
+      "fileCount": 1,
+      "totalSize": 998364
+    }
+  ]
+}

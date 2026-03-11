@@ -1,11 +1,13 @@
 {
   "version": 1,
-  "updatedAt": "2026-03-10T10:02:37.133Z",
+  "updatedAt": "2026-03-11T11:47:07.261Z",
   "pathToWorkspaceId": {
     "d:/论文阅读": "workspace__7cf6eaa0",
     "d:/日内瓦申请": "workspace__78e2eb7e",
     "d:/test_workspace": "test_workspace__ee13fd80",
     "/Users/nnnnm/Desktop/learn": "learn__29d6da3d",
-    "/Users/nnnnm/Desktop/yanzhi-test": "yanzhi-test__aaa15a94"
+    "/Users/nnnnm/Desktop/yanzhi-test": "yanzhi-test__aaa15a94",
+    "c:/users/32665/desktop/test_yanzhi/llm": "LLM__b0ceed98",
+    "c:/users/32665/desktop/test_yanzhi": "test_yanzhi__d545a755"
   }
 }

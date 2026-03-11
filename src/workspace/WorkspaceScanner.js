@@ -6,7 +6,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { getAIClient } = require('../screenshot/aiClient');
+const metadataManager = require('../utils/MetadataManager');
 
 class WorkspaceScanner {
     constructor(dataDir) {
@@ -241,13 +241,25 @@ class WorkspaceScanner {
      * 为文件夹生成详细 JSON（递归扫描所有子目录并保持树状结构）
      * @param {string} folderPath - 文件夹路径
      */
+    /**
+     * 获取文件夹对应的详情文件名（路径哈希）
+     */
+    getFolderDetailFilename(folderPath) {
+        if (!this.currentWorkspace) return null;
+        const relative = path.relative(this.currentWorkspace.workspacePath, folderPath);
+        if (relative === '') return 'root.json';
+        const hash = crypto.createHash('md5').update(relative).digest('hex').substring(0, 8);
+        return `${path.basename(folderPath)}_${hash}.json`;
+    }
+
     generateFolderDetailJson(folderPath) {
         const folderName = path.basename(folderPath);
         if (!this.currentWorkspace) {
             return;
         }
 
-        const detailFile = path.join(this.currentWorkspace.dataDir, `${folderName}.json`);
+        const detailFilename = this.getFolderDetailFilename(folderPath);
+        const detailFile = path.join(this.currentWorkspace.dataDir, detailFilename);
 
         try {
             const buildTree = (currentPath, relativePath = '') => {
@@ -285,8 +297,8 @@ class WorkspaceScanner {
                         continue;
                     }
 
-                    // 跳过生成的详细 JSON 本身
-                    if (item.name === `${folderName}.json`) {
+                    // 跳过 Sidecar 元数据文件以及任何 JSON 配置文件 (系统缓存等)
+                    if (item.name.toLowerCase().endsWith('.meta.json') || item.name.toLowerCase().endsWith('.json')) {
                         continue;
                     }
 
@@ -303,6 +315,20 @@ class WorkspaceScanner {
                             modifiedTime: stats.mtime.toISOString(),
                             size: stats.size,
                         });
+
+                        // 尝试合并 Sidecar 元数据
+                        if (ext === 'pdf') {
+                            const lastFile = files[files.length - 1];
+                            const meta = metadataManager.loadMetadata(itemPath);
+                            if (meta) {
+                                lastFile.meta = meta;
+                                // 将关键字段提升到顶级以方便 UI 访问
+                                lastFile.arxivId = meta.arxivId || meta.id;
+                                lastFile.sourceUrl = meta.pdfUrl || meta.url;
+                                lastFile.authors = meta.authors;
+                                lastFile.abstract = meta.abstract || meta.summary;
+                            }
+                        }
                     } catch (err) {
                         console.warn(`[WorkspaceScanner] 读取文件信息失败: ${itemPath}`, err.message);
                     }
@@ -395,7 +421,8 @@ class WorkspaceScanner {
                 const folderInfo = {
                     name: folder.name,
                     fileCount: 0,
-                    totalSize: 0
+                    totalSize: 0,
+                    detailFile: this.getFolderDetailFilename(folderPath)
                 };
 
                 console.log(`[WorkspaceScanner] 统计文件夹: ${folder.name} (${folderPath})`);
@@ -417,8 +444,9 @@ class WorkspaceScanner {
                             if (item.isDirectory()) {
                                 countRecursive(path.join(currentPath, item.name));
                             } else if (item.isFile()) {
-                                // 跳过可能残留的旧版详细 JSON 文件
+                                // 跳过可能残留的旧版详细 JSON 文件以及 Sidecar 元数据文件
                                 if (item.name.endsWith('.json') && item.name === `${folder.name}.json`) continue;
+                                if (item.name.toLowerCase().endsWith('.meta.json')) continue;
 
                                 const filePath = path.join(currentPath, item.name);
                                 let stats;

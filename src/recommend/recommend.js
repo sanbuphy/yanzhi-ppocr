@@ -128,19 +128,29 @@ async function performSearch(query, page = 1) {
       const currentPagePapers = result.papers.slice(startIndex, endIndex);
       
       // 将 Arxiv 返回的论文转换为我们的格式
-      recommendedArticles = currentPagePapers.map((paper, index) => ({
+      recommendedArticles = result.papers.map((paper, index) => ({
         id: Date.now() + index,
         title: paper.title,
-        authors: paper.authors,
-        publication: `arXiv | ${paper.published_date}`,
-        date: paper.published_date,
+        authors: Array.isArray(paper.authors) ? paper.authors.join(', ') : paper.authors,
+        publication: `arXiv | ${paper.published || paper.published_date}`,
+        date: paper.published || paper.published_date,
         source: 'arXiv',
         sourceType: 'arxiv',
-        abstract: paper.summary,
-        url: paper.url,
-        pdfUrl: paper.pdf_url,
+        abstract: paper.abstract || paper.summary,
+        url: paper.url || (paper.arxivId ? `https://arxiv.org/abs/${paper.arxivId}` : null),
+        pdfUrl: paper.pdfUrl || paper.pdf_url,
+        arxivId: paper.arxivId,
         expanded: false
       }));
+      
+      // 串联点：在渲染前检查本地是否存在
+      for (const article of recommendedArticles) {
+          const check = await window.electronAPI.arxiv.checkPresence(article.arxivId || article.id);
+          if (check && check.exists) {
+              article.localPath = check.path;
+              article.stored = true;
+          }
+      }
       
       renderArticles();
       updatePagination();
@@ -442,6 +452,25 @@ function createArticleCard(article) {
     });
     actions.appendChild(downloadBtn);
   }
+
+  // 如果已经存储，显示状态
+  if (article.stored) {
+    const storedTag = document.createElement('div');
+    storedTag.className = 'article-stored-tag';
+    storedTag.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      <span style="color: #22c55e; font-size: 12px; margin-left: 4px;">已在库</span>
+    `;
+    actions.appendChild(storedTag);
+    // 下载按钮可以视觉上弱化
+    const downloadBtn = actions.querySelector('.article-download-btn');
+    if (downloadBtn) {
+        downloadBtn.style.opacity = '0.5';
+        downloadBtn.querySelector('span').textContent = '重新下载';
+    }
+  }
   
   const expand = document.createElement('div');
   expand.className = 'article-expand';
@@ -514,8 +543,17 @@ async function downloadAndSavePaper(article, button) {
     `;
     
     // 3. 调用 AI 分类并保存到合适的文件夹
-    const description = `论文标题: ${article.title}\n作者: ${article.authors}\n摘要: ${article.abstract.substring(0, 500)}`;
-    const saveResult = await window.electronAPI.arxiv.saveToFolder(downloadResult.path, description);
+    // 串联点：传递完整的 JSON 元数据而不仅仅是字符串描述
+    const metadata = {
+        title: article.title,
+        authors: article.authors,
+        arxivId: article.arxivId || article.id,
+        published: article.date,
+        url: article.url,
+        pdfUrl: article.pdfUrl,
+        abstract: article.abstract
+    };
+    const saveResult = await window.electronAPI.arxiv.saveToFolder(downloadResult.path, JSON.stringify(metadata));
     
     if (saveResult.success) {
       // 成功

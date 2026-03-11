@@ -70,8 +70,8 @@ class YanzhiAgent {
     async process(instruction, context = {}) {
         const instructionLower = instruction.toLowerCase();
 
-        // 总结技能
-        if (['总结', '摘要', '概括', 'summarize'].some(kw => instructionLower.includes(kw))) {
+        // 总结/讲解技能
+        if (['总结', '摘要', '概括', 'summarize', '讲解', '分析', '解释', '解读'].some(kw => instructionLower.includes(kw))) {
             if (context.content) {
                 const result = await this.summarize(
                     context.content,
@@ -92,8 +92,9 @@ class YanzhiAgent {
             return { error: '缺少内容参数，请提供 content' };
         }
 
-        // 推荐技能
-        if (['推荐', '类似', '相关', 'recommend', '论文', 'arxiv'].some(kw => instructionLower.includes(kw))) {
+        // 推荐技能 - 降低“论文”关键词的侵略性，优先匹配更具体的意图
+        if (['推荐', '类似', '相关', 'recommend', 'arxiv'].some(kw => instructionLower.includes(kw)) || 
+            (instructionLower.includes('论文') && ['找', '搜', '查', '发现', '看到'].some(kw => instructionLower.includes(kw)))) {
             const result = await this.recommend(context.query || instruction, context.maxResults || 5);
             return { skill: 'recommend', result };
         }

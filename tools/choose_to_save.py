@@ -63,7 +63,7 @@ class ContentManager:
             print(f"创建文件夹失败: {e}")
             return False
 
-    def save_content(self, input_type, file_path=None, description=None, text_content=None):
+    def save_content(self, input_type, file_path=None, description=None, text_content=None, sub_folder=None, base_path=None, filename=None):
         """保存内容到合适的文件夹"""
         try:
             # 这里需要实现智能分类逻辑
@@ -78,8 +78,18 @@ class ContentManager:
                 elif input_type == InputType.PDF:
                     description = "PDF文档"
 
+            # 确定基础路径：优先使用传入的 base_path，否则使用默认的 data 目录
+            effective_base = base_path if base_path else os.path.dirname(self.config_file)
+
+            # 优先使用指定的子文件夹
+            if sub_folder:
+                target_folder = self.create_folder(sub_folder, effective_base)
+                if not target_folder:
+                    # 如果创建失败（通常是因为已存在），尝试直接获取路径
+                    target_folder = os.path.join(effective_base, sub_folder)
+            
             # 找到最合适的文件夹（暂时用第一个）
-            if self.folder_config["folders"]:
+            elif self.folder_config["folders"]:
                 target_folder = self.folder_config["folders"][0]["path"]
             else:
                 # 如果没有文件夹，创建一个默认的
@@ -107,8 +117,13 @@ class ContentManager:
 
             elif input_type == InputType.PDF:
                 if file_path and os.path.exists(file_path):
-                    filename = f"pdf_{timestamp}.pdf"
+                    if not filename:
+                        filename = f"pdf_{timestamp}.pdf"
+                    elif not filename.lower().endswith('.pdf'):
+                        filename += '.pdf'
+                    
                     full_path = os.path.join(target_folder, filename)
+                    # 如果文件名冲突，保留原样（简单处理）
                     shutil.copy2(file_path, full_path)
                 else:
                     return False

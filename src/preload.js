@@ -66,6 +66,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     search: (query, maxResults) => ipcRenderer.invoke('arxiv:search', query, maxResults),
     download: (pdfUrl, title) => ipcRenderer.invoke('arxiv:download', pdfUrl, title),
     saveToFolder: (pdfPath, description) => ipcRenderer.invoke('arxiv:saveToFolder', pdfPath, description),
+    checkPresence: (arxivId) => ipcRenderer.invoke('arxiv:checkPresence', arxivId),
   },
   
   // 定时推荐

@@ -1,0 +1,91 @@
+{
+  "lastScanTime": "2026-03-11T12:03:07.464Z",
+  "totalFiles": 12,
+  "folderCount": 4,
+  "mdFileCount": 4,
+  "pdfFileCount": 6,
+  "imageCount": 2,
+  "otherCount": 0,
+  "monthlyNewFiles": 0,
+  "monthlyNewNotes": 0,
+  "monthlyNewImages": 0,
+  "recentFiles": [
+    {
+      "name": "Think Before You Lie_ How Reasoning Improves Honesty.pdf",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\文章\\Think Before You Lie_ How Reasoning Improves Honesty.pdf",
+      "folder": "LLM",
+      "addedTime": "2026-03-11T10:30:21.920Z",
+      "size": 7160409
+    },
+    {
+      "name": "Understanding the Use of a Large Language Model-Powered Guide to Make Virtual Reality Accessible for.pdf",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\文章\\Understanding the Use of a Large Language Model-Powered Guide to Make Virtual Reality Accessible for.pdf",
+      "folder": "LLM",
+      "addedTime": "2026-03-11T09:16:25.116Z",
+      "size": 3151028
+    },
+    {
+      "name": "多模态大模型.md",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\多模态大模型\\多模态大模型.md",
+      "folder": "多模态大模型",
+      "addedTime": "2026-01-07T17:55:49.815Z",
+      "size": 86
+    },
+    {
+      "name": "NavAI_ A Generalizable LLM Framework for Navigation Tasks in Virtual Reality Environments.pdf",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\文章\\NavAI_ A Generalizable LLM Framework for Navigation Tasks in Virtual Reality Environments.pdf",
+      "folder": "LLM",
+      "addedTime": "2026-01-07T15:22:29.071Z",
+      "size": 998364
+    },
+    {
+      "name": "Muses_ Designing, Composing, Generating Nonexistent Fantasy 3D Creatures without Training.pdf",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\视频生成\\文章\\Muses_ Designing, Composing, Generating Nonexistent Fantasy 3D Creatures without Training.pdf",
+      "folder": "视频生成",
+      "addedTime": "2026-01-07T15:19:47.311Z",
+      "size": 12380962
+    }
+  ],
+  "recentMonthFiles": [
+    {
+      "name": "Think Before You Lie_ How Reasoning Improves Honesty.pdf",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\文章\\Think Before You Lie_ How Reasoning Improves Honesty.pdf",
+      "folder": "LLM",
+      "addedTime": "2026-03-11T10:30:21.920Z",
+      "size": 7160409
+    },
+    {
+      "name": "Understanding the Use of a Large Language Model-Powered Guide to Make Virtual Reality Accessible for.pdf",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\文章\\Understanding the Use of a Large Language Model-Powered Guide to Make Virtual Reality Accessible for.pdf",
+      "folder": "LLM",
+      "addedTime": "2026-03-11T09:16:25.116Z",
+      "size": 3151028
+    }
+  ],
+  "folders": [
+    {
+      "name": "LLM",
+      "fileCount": 6,
+      "totalSize": 17480355,
+      "detailFile": "LLM_b8cc08c1.json"
+    },
+    {
+      "name": "多模态大模型",
+      "fileCount": 1,
+      "totalSize": 86,
+      "detailFile": "多模态大模型_98b00a25.json"
+    },
+    {
+      "name": "视频生成",
+      "fileCount": 4,
+      "totalSize": 13348501,
+      "detailFile": "视频生成_9a1641a1.json"
+    },
+    {
+      "name": "语音",
+      "fileCount": 1,
+      "totalSize": 74,
+      "detailFile": "语音_48df356f.json"
+    }
+  ]
+}

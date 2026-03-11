@@ -1,0 +1,206 @@
+{
+  "folderName": "LLM",
+  "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM",
+  "workspaceId": "test_yanzhi__d545a755",
+  "scanTime": "2026-03-11T12:03:07.441Z",
+  "files": [
+    {
+      "name": "LLM.md",
+      "type": "file",
+      "path": "LLM.md",
+      "format": "md",
+      "addedTime": "2026-01-05T12:07:18.022Z",
+      "modifiedTime": "2026-01-07T15:11:46.876Z",
+      "size": 14870
+    }
+  ],
+  "children": [
+    {
+      "name": "images",
+      "type": "folder",
+      "path": "images",
+      "files": [
+        {
+          "name": "image_20260107_223709.png",
+          "type": "file",
+          "path": "images/image_20260107_223709.png",
+          "format": "png",
+          "addedTime": "2026-01-07T14:37:09.209Z",
+          "modifiedTime": "2026-01-07T14:37:09.219Z",
+          "size": 69993
+        }
+      ],
+      "children": []
+    },
+    {
+      "name": "博客",
+      "type": "folder",
+      "path": "博客",
+      "files": [
+        {
+          "name": "一文搞懂LLM大模型！LLM从入门到精通万字长文（2024.12月最新）_llm模型-CSDN博客_224255.pdf",
+          "type": "file",
+          "path": "博客/一文搞懂LLM大模型！LLM从入门到精通万字长文（2024.12月最新）_llm模型-CSDN博客_224255.pdf",
+          "format": "pdf",
+          "addedTime": "2026-01-07T14:43:06.871Z",
+          "modifiedTime": "2026-01-07T14:43:06.875Z",
+          "size": 6085691
+        }
+      ],
+      "children": []
+    },
+    {
+      "name": "文章",
+      "type": "folder",
+      "path": "文章",
+      "files": [
+        {
+          "name": "Think Before You Lie_ How Reasoning Improves Honesty.pdf",
+          "type": "file",
+          "path": "文章/Think Before You Lie_ How Reasoning Improves Honesty.pdf",
+          "format": "pdf",
+          "addedTime": "2026-03-11T10:30:21.920Z",
+          "modifiedTime": "2026-03-11T10:30:20.666Z",
+          "size": 7160409,
+          "meta": {
+            "title": "Think Before You Lie: How Reasoning Improves Honesty",
+            "authors": "Ann Yuan, Asma Ghandeharioun, Carter Blum, Alicia Machado, Jessica Hoffmann, Daphne Ippolito, Martin Wattenberg, Lucas Dixon, Katja Filippova",
+            "arxivId": "2603.09957v1",
+            "published": "2026-03-10T17:52:49Z",
+            "url": "https://arxiv.org/abs/2603.09957v1",
+            "pdfUrl": "https://arxiv.org/pdf/2603.09957v1",
+            "abstract": "While existing evaluations of large language models (LLMs) measure deception rates, the underlying conditions that give rise to deceptive behavior are poorly understood. We investigate this question using a novel dataset of realistic moral trade-offs where honesty incurs variable costs. Contrary to humans, who tend to become less honest given time to deliberate (Capraro, 2017; Capraro et al., 2019), we find that reasoning consistently increases honesty across scales and for several LLM families. This effect is not only a function of the reasoning content, as reasoning traces are often poor predictors of final behaviors. Rather, we show that the underlying geometry of the representational space itself contributes to the effect. Namely, we observe that deceptive regions within this space are metastable: deceptive answers are more easily destabilized by input paraphrasing, output resampling, and activation noise than honest ones. We interpret the effect of reasoning in this vein: generating deliberative tokens as part of moral reasoning entails the traversal of a biased representational space, ultimately nudging the model toward its more stable, honest defaults.",
+            "linkedAt": "2026-03-11T10:30:21.946Z",
+            "localPath": "C:/Users/32665/Desktop/test_yanzhi\\LLM/文章\\Think Before You Lie_ How Reasoning Improves Honesty.pdf"
+          },
+          "arxivId": "2603.09957v1",
+          "sourceUrl": "https://arxiv.org/pdf/2603.09957v1",
+          "authors": "Ann Yuan, Asma Ghandeharioun, Carter Blum, Alicia Machado, Jessica Hoffmann, Daphne Ippolito, Martin Wattenberg, Lucas Dixon, Katja Filippova",
+          "abstract": "While existing evaluations of large language models (LLMs) measure deception rates, the underlying conditions that give rise to deceptive behavior are poorly understood. We investigate this question using a novel dataset of realistic moral trade-offs where honesty incurs variable costs. Contrary to humans, who tend to become less honest given time to deliberate (Capraro, 2017; Capraro et al., 2019), we find that reasoning consistently increases honesty across scales and for several LLM families. This effect is not only a function of the reasoning content, as reasoning traces are often poor predictors of final behaviors. Rather, we show that the underlying geometry of the representational space itself contributes to the effect. Namely, we observe that deceptive regions within this space are metastable: deceptive answers are more easily destabilized by input paraphrasing, output resampling, and activation noise than honest ones. We interpret the effect of reasoning in this vein: generating deliberative tokens as part of moral reasoning entails the traversal of a biased representational space, ultimately nudging the model toward its more stable, honest defaults."
+        },
+        {
+          "name": "Understanding the Use of a Large Language Model-Powered Guide to Make Virtual Reality Accessible for.pdf",
+          "type": "file",
+          "path": "文章/Understanding the Use of a Large Language Model-Powered Guide to Make Virtual Reality Accessible for.pdf",
+          "format": "pdf",
+          "addedTime": "2026-03-11T09:16:25.116Z",
+          "modifiedTime": "2026-03-11T10:15:32.257Z",
+          "size": 3151028,
+          "meta": {
+            "title": "Understanding the Use of a Large Language Model-Powered Guide to Make Virtual Reality Accessible for Blind and Low Vision People",
+            "authors": "Jazmin Collins, Sharon Y Lin, Tianqi Liu, Andrea Stevenson Won, Shiri Azenkot",
+            "arxivId": "2603.09964v1",
+            "published": "2026-03-10T17:56:57Z",
+            "url": "https://arxiv.org/abs/2603.09964v1",
+            "pdfUrl": "https://arxiv.org/pdf/2603.09964v1",
+            "abstract": "As social virtual reality (VR) grows more popular, addressing accessibility for blind and low vision (BLV) users is increasingly critical. Researchers have proposed an AI \"sighted guide\" to help users navigate VR and answer their questions, but it has not been studied with users. To address this gap, we developed a large language model (LLM)-powered guide and studied its use with 16 BLV participants in virtual environments with confederates posing as other users. We found that when alone, participants treated the guide as a tool, but treated it companionably around others, giving it nicknames, rationalizing its mistakes with its appearance, and encouraging confederate-guide interaction. Our work furthers understanding of guides as a versatile method for VR accessibility and presents design recommendations for future guides.",
+            "linkedAt": "2026-03-11T10:15:33.942Z",
+            "localPath": "C:/Users/32665/Desktop/test_yanzhi\\LLM/文章\\Understanding the Use of a Large Language Model-Powered Guide to Make Virtual Reality Accessible for.pdf"
+          },
+          "arxivId": "2603.09964v1",
+          "sourceUrl": "https://arxiv.org/pdf/2603.09964v1",
+          "authors": "Jazmin Collins, Sharon Y Lin, Tianqi Liu, Andrea Stevenson Won, Shiri Azenkot",
+          "abstract": "As social virtual reality (VR) grows more popular, addressing accessibility for blind and low vision (BLV) users is increasingly critical. Researchers have proposed an AI \"sighted guide\" to help users navigate VR and answer their questions, but it has not been studied with users. To address this gap, we developed a large language model (LLM)-powered guide and studied its use with 16 BLV participants in virtual environments with confederates posing as other users. We found that when alone, participants treated the guide as a tool, but treated it companionably around others, giving it nicknames, rationalizing its mistakes with its appearance, and encouraging confederate-guide interaction. Our work furthers understanding of guides as a versatile method for VR accessibility and presents design recommendations for future guides."
+        },
+        {
+          "name": "NavAI_ A Generalizable LLM Framework for Navigation Tasks in Virtual Reality Environments.pdf",
+          "type": "file",
+          "path": "文章/NavAI_ A Generalizable LLM Framework for Navigation Tasks in Virtual Reality Environments.pdf",
+          "format": "pdf",
+          "addedTime": "2026-01-07T15:22:29.071Z",
+          "modifiedTime": "2026-01-07T15:22:29.074Z",
+          "size": 998364
+        }
+      ],
+      "children": []
+    }
+  ],
+  "totalFileCount": 6,
+  "fileCount": 6,
+  "allFiles": [
+    {
+      "name": "LLM.md",
+      "type": "file",
+      "path": "LLM.md",
+      "format": "md",
+      "addedTime": "2026-01-05T12:07:18.022Z",
+      "modifiedTime": "2026-01-07T15:11:46.876Z",
+      "size": 14870
+    },
+    {
+      "name": "image_20260107_223709.png",
+      "type": "file",
+      "path": "images/image_20260107_223709.png",
+      "format": "png",
+      "addedTime": "2026-01-07T14:37:09.209Z",
+      "modifiedTime": "2026-01-07T14:37:09.219Z",
+      "size": 69993
+    },
+    {
+      "name": "一文搞懂LLM大模型！LLM从入门到精通万字长文（2024.12月最新）_llm模型-CSDN博客_224255.pdf",
+      "type": "file",
+      "path": "博客/一文搞懂LLM大模型！LLM从入门到精通万字长文（2024.12月最新）_llm模型-CSDN博客_224255.pdf",
+      "format": "pdf",
+      "addedTime": "2026-01-07T14:43:06.871Z",
+      "modifiedTime": "2026-01-07T14:43:06.875Z",
+      "size": 6085691
+    },
+    {
+      "name": "Think Before You Lie_ How Reasoning Improves Honesty.pdf",
+      "type": "file",
+      "path": "文章/Think Before You Lie_ How Reasoning Improves Honesty.pdf",
+      "format": "pdf",
+      "addedTime": "2026-03-11T10:30:21.920Z",
+      "modifiedTime": "2026-03-11T10:30:20.666Z",
+      "size": 7160409,
+      "meta": {
+        "title": "Think Before You Lie: How Reasoning Improves Honesty",
+        "authors": "Ann Yuan, Asma Ghandeharioun, Carter Blum, Alicia Machado, Jessica Hoffmann, Daphne Ippolito, Martin Wattenberg, Lucas Dixon, Katja Filippova",
+        "arxivId": "2603.09957v1",
+        "published": "2026-03-10T17:52:49Z",
+        "url": "https://arxiv.org/abs/2603.09957v1",
+        "pdfUrl": "https://arxiv.org/pdf/2603.09957v1",
+        "abstract": "While existing evaluations of large language models (LLMs) measure deception rates, the underlying conditions that give rise to deceptive behavior are poorly understood. We investigate this question using a novel dataset of realistic moral trade-offs where honesty incurs variable costs. Contrary to humans, who tend to become less honest given time to deliberate (Capraro, 2017; Capraro et al., 2019), we find that reasoning consistently increases honesty across scales and for several LLM families. This effect is not only a function of the reasoning content, as reasoning traces are often poor predictors of final behaviors. Rather, we show that the underlying geometry of the representational space itself contributes to the effect. Namely, we observe that deceptive regions within this space are metastable: deceptive answers are more easily destabilized by input paraphrasing, output resampling, and activation noise than honest ones. We interpret the effect of reasoning in this vein: generating deliberative tokens as part of moral reasoning entails the traversal of a biased representational space, ultimately nudging the model toward its more stable, honest defaults.",
+        "linkedAt": "2026-03-11T10:30:21.946Z",
+        "localPath": "C:/Users/32665/Desktop/test_yanzhi\\LLM/文章\\Think Before You Lie_ How Reasoning Improves Honesty.pdf"
+      },
+      "arxivId": "2603.09957v1",
+      "sourceUrl": "https://arxiv.org/pdf/2603.09957v1",
+      "authors": "Ann Yuan, Asma Ghandeharioun, Carter Blum, Alicia Machado, Jessica Hoffmann, Daphne Ippolito, Martin Wattenberg, Lucas Dixon, Katja Filippova",
+      "abstract": "While existing evaluations of large language models (LLMs) measure deception rates, the underlying conditions that give rise to deceptive behavior are poorly understood. We investigate this question using a novel dataset of realistic moral trade-offs where honesty incurs variable costs. Contrary to humans, who tend to become less honest given time to deliberate (Capraro, 2017; Capraro et al., 2019), we find that reasoning consistently increases honesty across scales and for several LLM families. This effect is not only a function of the reasoning content, as reasoning traces are often poor predictors of final behaviors. Rather, we show that the underlying geometry of the representational space itself contributes to the effect. Namely, we observe that deceptive regions within this space are metastable: deceptive answers are more easily destabilized by input paraphrasing, output resampling, and activation noise than honest ones. We interpret the effect of reasoning in this vein: generating deliberative tokens as part of moral reasoning entails the traversal of a biased representational space, ultimately nudging the model toward its more stable, honest defaults."
+    },
+    {
+      "name": "Understanding the Use of a Large Language Model-Powered Guide to Make Virtual Reality Accessible for.pdf",
+      "type": "file",
+      "path": "文章/Understanding the Use of a Large Language Model-Powered Guide to Make Virtual Reality Accessible for.pdf",
+      "format": "pdf",
+      "addedTime": "2026-03-11T09:16:25.116Z",
+      "modifiedTime": "2026-03-11T10:15:32.257Z",
+      "size": 3151028,
+      "meta": {
+        "title": "Understanding the Use of a Large Language Model-Powered Guide to Make Virtual Reality Accessible for Blind and Low Vision People",
+        "authors": "Jazmin Collins, Sharon Y Lin, Tianqi Liu, Andrea Stevenson Won, Shiri Azenkot",
+        "arxivId": "2603.09964v1",
+        "published": "2026-03-10T17:56:57Z",
+        "url": "https://arxiv.org/abs/2603.09964v1",
+        "pdfUrl": "https://arxiv.org/pdf/2603.09964v1",
+        "abstract": "As social virtual reality (VR) grows more popular, addressing accessibility for blind and low vision (BLV) users is increasingly critical. Researchers have proposed an AI \"sighted guide\" to help users navigate VR and answer their questions, but it has not been studied with users. To address this gap, we developed a large language model (LLM)-powered guide and studied its use with 16 BLV participants in virtual environments with confederates posing as other users. We found that when alone, participants treated the guide as a tool, but treated it companionably around others, giving it nicknames, rationalizing its mistakes with its appearance, and encouraging confederate-guide interaction. Our work furthers understanding of guides as a versatile method for VR accessibility and presents design recommendations for future guides.",
+        "linkedAt": "2026-03-11T10:15:33.942Z",
+        "localPath": "C:/Users/32665/Desktop/test_yanzhi\\LLM/文章\\Understanding the Use of a Large Language Model-Powered Guide to Make Virtual Reality Accessible for.pdf"
+      },
+      "arxivId": "2603.09964v1",
+      "sourceUrl": "https://arxiv.org/pdf/2603.09964v1",
+      "authors": "Jazmin Collins, Sharon Y Lin, Tianqi Liu, Andrea Stevenson Won, Shiri Azenkot",
+      "abstract": "As social virtual reality (VR) grows more popular, addressing accessibility for blind and low vision (BLV) users is increasingly critical. Researchers have proposed an AI \"sighted guide\" to help users navigate VR and answer their questions, but it has not been studied with users. To address this gap, we developed a large language model (LLM)-powered guide and studied its use with 16 BLV participants in virtual environments with confederates posing as other users. We found that when alone, participants treated the guide as a tool, but treated it companionably around others, giving it nicknames, rationalizing its mistakes with its appearance, and encouraging confederate-guide interaction. Our work furthers understanding of guides as a versatile method for VR accessibility and presents design recommendations for future guides."
+    },
+    {
+      "name": "NavAI_ A Generalizable LLM Framework for Navigation Tasks in Virtual Reality Environments.pdf",
+      "type": "file",
+      "path": "文章/NavAI_ A Generalizable LLM Framework for Navigation Tasks in Virtual Reality Environments.pdf",
+      "format": "pdf",
+      "addedTime": "2026-01-07T15:22:29.071Z",
+      "modifiedTime": "2026-01-07T15:22:29.074Z",
+      "size": 998364
+    }
+  ]
+}
