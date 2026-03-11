@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"require\\('./src/agent/ClassifySkill.js'\\); console.log\\('ClassifySkill.js 加载成功'\\)\")",
+      "Bash(node -e \"try { require\\('./src/agent/ClassifySkill.js'\\); console.log\\('ClassifySkill.js 加载成功'\\); } catch\\(e\\) { console.error\\('加载失败:', e.message\\); }\")",
+      "Bash(node -e \"try { require\\('./src/agent/index.js'\\); console.log\\('agent/index.js 加载成功'\\); } catch\\(e\\) { console.error\\('加载失败:', e.message\\); }\")",
+      "Bash(node -e \"try { require\\('./src/agent/index.js'\\); console.log\\('OK'\\); } catch\\(e\\) { console.error\\('Error:', e.message\\); }\")"
+    ]
+  }
+}

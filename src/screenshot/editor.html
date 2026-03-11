@@ -444,6 +444,166 @@
                 transform: scale(0.9);
             }
         }
+
+        /* 保存确认面板样式 */
+        #save-panel {
+            position: fixed;
+            inset: 0;
+            display: none;
+            z-index: 2700;
+            overflow: hidden;
+        }
+
+        #save-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.62);
+        }
+
+        #save-panel-content {
+            position: relative;
+            width: min(680px, calc(100vw - 36px));
+            max-height: min(85vh, 720px);
+            display: flex;
+            flex-direction: column;
+            background: #1f1f1f;
+            border: 1px solid #3a3a3a;
+            border-radius: 10px;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+        }
+
+        #save-header {
+            height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+            border-bottom: 1px solid #333;
+            color: #f1f1f1;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: move;
+            user-select: none;
+        }
+
+        #save-close-x {
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            color: #d8d8d8;
+            font-size: 18px;
+            line-height: 1;
+            padding: 2px 4px;
+        }
+
+        #save-close-x:hover {
+            color: #fff;
+        }
+
+        #save-body {
+            padding: 12px 14px;
+            overflow: auto;
+            flex: 1;
+        }
+
+        .save-section {
+            margin-bottom: 12px;
+        }
+
+        .save-label {
+            display: block;
+            font-size: 12px;
+            color: #9cb0c3;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+        }
+
+        .save-preview {
+            background: #232323;
+            border: 1px solid #383838;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 13px;
+            color: #e8e8e8;
+            line-height: 1.55;
+            max-height: 140px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .save-path-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .save-path-input {
+            flex: 1;
+            background: #232323;
+            border: 1px solid #383838;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 13px;
+            color: #e8e8e8;
+            outline: none;
+        }
+
+        .save-path-input:focus {
+            border-color: #0078d4;
+        }
+
+        .save-browse-btn {
+            background: #444;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 14px;
+            color: #fff;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .save-browse-btn:hover {
+            background: #5a5a5a;
+        }
+
+        #save-actions {
+            height: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 0 14px;
+            border-top: 1px solid #333;
+        }
+
+        .save-btn {
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #fff;
+            font-size: 13px;
+            height: 34px;
+            padding: 0 16px;
+            min-width: 88px;
+        }
+
+        .save-btn.cancel {
+            background: #4d4d4d;
+        }
+
+        .save-btn.cancel:hover {
+            background: #5d5d5d;
+        }
+
+        .save-btn.confirm {
+            background: #22a46f;
+        }
+
+        .save-btn.confirm:hover {
+            background: #2fbe82;
+        }
     </style>
 </head>
 <body>
@@ -486,7 +646,6 @@
 
             <div class="tool-group actions">
                 <button class="tool-btn" id="ai-btn">AI解读</button>
-                <button class="tool-btn warn" id="ai-save-btn">解读并入库</button>
                 <button class="tool-btn primary" id="finish-btn">完成</button>
                 <button class="tool-btn cancel" id="cancel-btn">取消</button>
             </div>
@@ -512,8 +671,41 @@
         </div>
     </div>
 
+    <!-- 新的保存确认面板 -->
+    <div id="save-panel">
+        <div id="save-backdrop"></div>
+        <div id="save-panel-content">
+            <div id="save-header">
+                <span id="save-title">AI 解读与保存</span>
+                <button id="save-close-x" title="关闭">×</button>
+            </div>
+            <div id="save-body">
+                <div class="save-section">
+                    <label class="save-label">OCR 文本</label>
+                    <div id="save-ocr-text" class="save-preview"></div>
+                </div>
+                <div class="save-section">
+                    <label class="save-label">AI 解读</label>
+                    <div id="save-ai-text" class="save-preview"></div>
+                </div>
+                <div class="save-section">
+                    <label class="save-label">保存路径</label>
+                    <div class="save-path-row">
+                        <input type="text" id="save-path-input" class="save-path-input" placeholder="请先选择文件夹">
+                        <button id="save-browse-btn" class="save-browse-btn">浏览...</button>
+                    </div>
+                </div>
+            </div>
+            <div id="save-actions">
+                <button class="save-btn cancel" id="save-cancel-btn">取消</button>
+                <button class="save-btn confirm" id="save-confirm-btn">保存</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const { ipcRenderer } = require('electron');
+        const path = require('path');
 
         const baseCanvas = document.getElementById('base-canvas');
         const baseCtx = baseCanvas.getContext('2d');
@@ -1035,37 +1227,169 @@
             eraserCursor.style.display = 'none';
         });
 
+        // 新的保存面板相关变量
+        const savePanel = document.getElementById('save-panel');
+        const savePanelContent = document.getElementById('save-panel-content');
+        const saveHeader = document.getElementById('save-header');
+        const saveOcrText = document.getElementById('save-ocr-text');
+        const saveAiText = document.getElementById('save-ai-text');
+        const savePathInput = document.getElementById('save-path-input');
+        const saveBrowseBtn = document.getElementById('save-browse-btn');
+        const saveCancelBtn = document.getElementById('save-cancel-btn');
+        const saveConfirmBtn = document.getElementById('save-confirm-btn');
+        const saveCloseX = document.getElementById('save-close-x');
+        const saveBackdrop = document.getElementById('save-backdrop');
+
+        let savePanelData = {
+            ocrText: '',
+            aiExplanation: '',
+            savePath: ''
+        };
+        let isDraggingSavePanel = false;
+        let dragSavePanelOffsetX = 0;
+        let dragSavePanelOffsetY = 0;
+
+        function showSavePanel(ocrText, aiExplanation, classifyResult) {
+            saveOcrText.textContent = ocrText || '无 OCR 内容';
+            saveAiText.textContent = aiExplanation || '无 AI 解读';
+
+            // 设置保存路径
+            if (classifyResult && classifyResult.success && classifyResult.savePath) {
+                savePathInput.value = classifyResult.savePath;
+                savePanelData.savePath = classifyResult.savePath;
+            } else {
+                savePathInput.value = classifyResult?.error || '未能获取保存路径';
+                savePanelData.savePath = '';
+            }
+
+            savePanelData.ocrText = ocrText || '';
+            savePanelData.aiExplanation = aiExplanation || '';
+
+            savePanel.style.display = 'block';
+
+            // 居中显示
+            const panelWidth = Math.min(680, window.innerWidth - 36);
+            const top = Math.max(20, Math.round((window.innerHeight - Math.min(720, window.innerHeight * 0.85)) / 2));
+            const left = Math.max(18, Math.round((window.innerWidth - panelWidth) / 2));
+            savePanelContent.style.position = 'absolute';
+            savePanelContent.style.top = `${top}px`;
+            savePanelContent.style.left = `${left}px`;
+        }
+
+        function hideSavePanel() {
+            savePanel.style.display = 'none';
+        }
+
         document.getElementById('ai-btn').addEventListener('click', async () => {
             commitActiveTextInput();
             setLoading(true);
             try {
-                const explanation = await ipcRenderer.invoke('editor:ai-explain', getCanvasDataUrl());
-                if (explanation && typeof explanation === 'object') {
-                    showAiAuditModal('AI 解读结果', explanation);
+                const result = await ipcRenderer.invoke('editor:ai-explain-and-classify', getCanvasDataUrl());
+
+                setLoading(false);
+
+                if (typeof result === 'string') {
+                    // 超时或其他错误
+                    showResultModal('AI 解读结果', result, { hideCopy: true });
+                    return;
+                }
+
+                const { ocrText, aiExplanation, classifyResult } = result;
+
+                // 显示新的保存面板
+                showSavePanel(ocrText, aiExplanation, classifyResult);
+
+            } catch (error) {
+                setLoading(false);
+                showResultModal('AI 解读失败', error.message || String(error), { hideCopy: true });
+            }
+        });
+
+        // 浏览按钮 - 选择保存路径
+        saveBrowseBtn.addEventListener('click', async () => {
+            const result = await ipcRenderer.invoke('editor:browse-folder');
+            if (result && result.filePaths && result.filePaths.length > 0) {
+                const selectedPath = result.filePaths[0];
+                const timestamp = Date.now();
+                const fileName = `screenshot_${timestamp}.png`;
+                savePathInput.value = path.join(selectedPath, fileName);
+                savePanelData.savePath = savePathInput.value;
+            }
+        });
+
+        // 保存按钮
+        saveConfirmBtn.addEventListener('click', async () => {
+            const savePath = savePathInput.value.trim();
+            if (!savePath) {
+                showToast('请选择保存路径', 'error');
+                return;
+            }
+
+            saveConfirmBtn.disabled = true;
+            try {
+                const result = await ipcRenderer.invoke('editor:save-to-folder', {
+                    base64: getCanvasDataUrl(),
+                    savePath: savePath,
+                    ocrText: savePanelData.ocrText,
+                    aiExplanation: savePanelData.aiExplanation
+                });
+
+                if (result.success) {
+                    hideSavePanel();
+                    const folderName = extractFolderName(result.path);
+                    showToast(`已保存到「${folderName}」文件夹`, 'success', 1800);
                 } else {
-                    showResultModal('AI 解读结果', explanation || '未返回内容');
+                    showToast(result.error || '保存失败', 'error');
                 }
             } catch (error) {
-                showResultModal('AI 解读失败', error.message || String(error), { hideCopy: true });
+                showToast(error.message || '保存失败', 'error');
             } finally {
-                setLoading(false);
+                saveConfirmBtn.disabled = false;
             }
+        });
+
+        // 取消按钮
+        saveCancelBtn.addEventListener('click', hideSavePanel);
+        saveCloseX.addEventListener('click', hideSavePanel);
+        saveBackdrop.addEventListener('click', hideSavePanel);
+
+        // 拖拽保存面板
+        saveHeader.addEventListener('mousedown', (e) => {
+            if (e.target === saveCloseX) return;
+            isDraggingSavePanel = true;
+            const panelRect = savePanelContent.getBoundingClientRect();
+            dragSavePanelOffsetX = e.clientX - panelRect.left;
+            dragSavePanelOffsetY = e.clientY - panelRect.top;
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDraggingSavePanel) return;
+            const panelRect = savePanelContent.getBoundingClientRect();
+            const nextLeft = Math.max(0, Math.min(e.clientX - dragSavePanelOffsetX, window.innerWidth - panelRect.width));
+            const nextTop = Math.max(0, Math.min(e.clientY - dragSavePanelOffsetY, window.innerHeight - panelRect.height));
+            savePanelContent.style.left = `${nextLeft}px`;
+            savePanelContent.style.top = `${nextTop}px`;
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDraggingSavePanel = false;
         });
 
         function showToast(message, type = 'success', duration = 1800) {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
-            
+
             const icon = type === 'success' ? '✓' : '✗';
             toast.innerHTML = `
                 <div class="icon">${icon}</div>
                 <div class="message">${message}</div>
             `;
-            
+
             container.innerHTML = '';
             container.appendChild(toast);
-            
+
             setTimeout(() => {
                 toast.remove();
             }, duration);
@@ -1077,30 +1401,6 @@
             // 返回倒数第二个部分（文件夹名）
             return parts.length >= 2 ? parts[parts.length - 2] : '根目录';
         }
-
-        document.getElementById('ai-save-btn').addEventListener('click', async () => {
-            commitActiveTextInput();
-            setLoading(true);
-            try {
-                const payload = await ipcRenderer.invoke('editor:explain-and-save', getCanvasDataUrl());
-                const result = payload && payload.result ? payload.result : null;
-                if (result && result.success) {
-                    const folderName = extractFolderName(result.path);
-                    setLoading(false);
-                    showToast(`已将图片存入「${folderName}」文件夹`, 'success', 1800);
-                    // 1.8秒后自动关闭窗口
-                    setTimeout(() => {
-                        ipcRenderer.send('editor:cancel');
-                    }, 1800);
-                } else {
-                    setLoading(false);
-                    showToast(result ? result.error : '入库失败', 'error', 2000);
-                }
-            } catch (error) {
-                setLoading(false);
-                showToast(error.message || '解读并入库失败', 'error', 2000);
-            }
-        });
 
         document.getElementById('finish-btn').addEventListener('click', async () => {
             commitActiveTextInput();
@@ -1160,7 +1460,9 @@
             if (e.key === 'Escape') {
                 if (activeTextInput) {
                     cancelActiveTextInput();
-                } else if (resultModal.style.display === 'flex') {
+                } else if (savePanel.style.display === 'block') {
+                    hideSavePanel();
+                } else if (resultModal.style.display === 'block') {
                     hideResultModal();
                 } else {
                     document.getElementById('cancel-btn').click();

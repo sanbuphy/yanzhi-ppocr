@@ -3,11 +3,13 @@
  * 获取当前活动窗口的选中文字或窗口标题文字
  */
 
-const { clipboard, globalShortcut, BrowserWindow, ipcMain } = require('electron');
+const { clipboard, globalShortcut, BrowserWindow, ipcMain, dialog } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 const SummarizeSkill = require('../agent/SummarizeSkill');
 const WindowsKeyboard = require('./WindowsKeyboard');
+const { getAgent } = require('../agent/index');
 
 const TEXT_EXPLANATION_TIMEOUT_MS = 10000;
 const AI_TIMEOUT_TEXT = 'AI请求超时';
@@ -26,7 +28,7 @@ class TextCapture {
     /**
      * 显示文本确认浮窗并等待用户动作
      * @param {string} text
-    * @returns {Promise<{action: 'copy_text'|'copy_explanation'|'auto_save'|'cancel', text: string, explanation: string}>}
+    * @returns {Promise<{action: 'copy_text'|'copy_explanation'|'auto_save'|'cancel', text: string, explanation: string, savePath: string}>}
      */
     async showTextConfirmWindow(text) {
         if (this.confirmWindow && !this.confirmWindow.isDestroyed()) {
@@ -39,54 +41,137 @@ class TextCapture {
             const submitChannel = `textcapture:confirm-submit:${nonce}`;
             const cancelChannel = `textcapture:confirm-cancel:${nonce}`;
             const explanationChannel = `textcapture:confirm-explanation:${nonce}`;
+            const classifyChannel = `textcapture:confirm-classify:${nonce}`;
+            const browseChannel = `textcapture:confirm-browse:${nonce}`;
+            const browseResultChannel = `textcapture:confirm-browse-result:${nonce}`;
+            const saveToFileChannel = `textcapture:save-to-file:${nonce}`;
             let settled = false;
             let explanationText = '';
+            let classifyResult = null;
 
-            const finish = (action, finalText = '') => {
+            const finish = (action, finalText = '', savePath = '') => {
                 if (settled) return;
                 settled = true;
                 ipcMain.removeListener(submitChannel, onSubmit);
                 ipcMain.removeListener(cancelChannel, onCancel);
+                ipcMain.removeListener(browseChannel, onBrowse);
+                ipcMain.removeListener(saveToFileChannel, onSaveToFile);
                 resolve({
                     action,
                     text: String(finalText || ''),
-                    explanation: String(explanationText || '')
+                    explanation: String(explanationText || ''),
+                    savePath: String(savePath || '')
                 });
             };
 
             const onSubmit = (event, payload) => {
-                const actionMap = {
-                    copy_text: 'copy_text',
-                    copy_explanation: 'copy_explanation',
-                    auto_save: 'auto_save'
-                };
-                const action = actionMap[payload?.action] || 'cancel';
-                const finalText = String(payload?.originalText || '').trim();
-                const latestExplanation = String(payload?.explanationText || '').trim();
-                if (latestExplanation) {
-                    explanationText = latestExplanation;
-                }
-                finish(action, finalText);
-                if (this.confirmWindow && !this.confirmWindow.isDestroyed()) {
-                    this.confirmWindow.close();
+                try {
+                    const actionMap = {
+                        copy_text: 'copy_text',
+                        copy_explanation: 'copy_explanation',
+                        auto_save: 'auto_save'
+                    };
+                    const action = actionMap[payload?.action] || 'cancel';
+                    const finalText = String(payload?.originalText || '').trim();
+                    const latestExplanation = String(payload?.explanationText || '').trim();
+                    const savePath = String(payload?.savePath || '').trim();
+                    if (latestExplanation) {
+                        explanationText = latestExplanation;
+                    }
+                    finish(action, finalText, savePath);
+                    if (this.confirmWindow && !this.confirmWindow.isDestroyed()) {
+                        this.confirmWindow.close();
+                    }
+                } catch (e) {
+                    console.error('提交操作出错:', e);
                 }
             };
 
             const onCancel = () => {
-                finish('cancel', '');
-                if (this.confirmWindow && !this.confirmWindow.isDestroyed()) {
-                    this.confirmWindow.close();
+                try {
+                    finish('cancel', '');
+                    if (this.confirmWindow && !this.confirmWindow.isDestroyed()) {
+                        this.confirmWindow.close();
+                    }
+                } catch (e) {
+                    console.error('取消操作出错:', e);
+                }
+            };
+
+            const onBrowse = async (event) => {
+                try {
+                    const result = await dialog.showOpenDialog(this.confirmWindow, {
+                        title: '选择保存文件',
+                        filters: [
+                            { name: 'Markdown', extensions: ['md'] },
+                            { name: 'Text', extensions: ['txt'] },
+                            { name: 'All Files', extensions: ['*'] }
+                        ],
+                        properties: ['openFile', 'createDirectory']
+                    });
+                    if (result && result.filePaths && result.filePaths.length > 0) {
+                        this.sendConfirmWindowMessage(browseResultChannel, {
+                            selectedPath: result.filePaths[0]
+                        });
+                    }
+                } catch (e) {
+                    console.error('浏览文件出错:', e);
+                }
+            };
+
+            const onSaveToFile = async (event, { filePath, text, explanation }) => {
+                try {
+                    // 读取现有文件内容
+                    let existingContent = '';
+                    if (fs.existsSync(filePath)) {
+                        existingContent = fs.readFileSync(filePath, 'utf-8');
+                    }
+
+                    // 追加新内容
+                    const timestamp = new Date().toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
+
+                    const newContent = `${existingContent ? existingContent + '\n' : ''}---
+时间: ${timestamp}
+原始文本:
+${text}
+
+AI 解释:
+${explanation}
+
+`;
+
+                    fs.writeFileSync(filePath, newContent, 'utf-8');
+
+                    this.sendConfirmWindowMessage('textcapture:save-result', {
+                        success: true,
+                        path: filePath
+                    });
+                } catch (e) {
+                    console.error('保存文件出错:', e);
+                    this.sendConfirmWindowMessage('textcapture:save-result', {
+                        success: false,
+                        error: e.message
+                    });
                 }
             };
 
             ipcMain.on(submitChannel, onSubmit);
             ipcMain.on(cancelChannel, onCancel);
+            ipcMain.on(browseChannel, onBrowse);
+            ipcMain.on(saveToFileChannel, onSaveToFile);
 
             this.confirmWindow = new BrowserWindow({
-                width: 560,
-                height: 500,
-                minWidth: 560,
-                minHeight: 500,
+                width: 580,
+                height: 580,
+                minWidth: 580,
+                minHeight: 580,
                 ...(this.mainWindow && !this.mainWindow.isDestroyed() ? { parent: this.mainWindow } : {}),
                 modal: false,
                 frame: false,
@@ -120,15 +205,34 @@ class TextCapture {
                         explanationText: '正在生成 AI 解释，请稍候...',
                         submitChannel,
                         cancelChannel,
-                        explanationChannel
+                        explanationChannel,
+                        classifyChannel,
+                        browseChannel,
+                        browseResultChannel
                     });
 
+                    // 生成 AI 解释
                     this.generateExplanation(text)
                         .then((aiText) => {
                             if (this.confirmWindow && !this.confirmWindow.isDestroyed()) {
                                 explanationText = aiText;
                                 this.sendConfirmWindowMessage(explanationChannel, {
                                     explanationText: aiText
+                                });
+
+                                // 执行智能分类
+                                return getAgent().classify({
+                                    content: text,
+                                    contentType: 'text'
+                                });
+                            }
+                            return null;
+                        })
+                        .then((result) => {
+                            if (result && this.confirmWindow && !this.confirmWindow.isDestroyed()) {
+                                classifyResult = result;
+                                this.sendConfirmWindowMessage(classifyChannel, {
+                                    classifyResult: result
                                 });
                             }
                         })
@@ -448,6 +552,7 @@ except Exception as e:
             const action = confirmResult?.action || 'cancel';
             const finalText = String(confirmResult?.text || '').trim();
             const explanationText = String(confirmResult?.explanation || '').trim();
+            const savePath = String(confirmResult?.savePath || '').trim();
 
             if (action === 'cancel') {
                 return;
@@ -473,19 +578,26 @@ except Exception as e:
                 return;
             }
 
-            const saveBody = [
-                '原始文本:',
-                finalText,
-                '',
-                'AI 解释:',
-                explanationText || 'AI 解释生成失败或为空'
-            ].join('\n');
-
-            const result = await this.saveToKnowledgeBase(saveBody, '用户选中的文字（原文+解释）');
-            if (result.success) {
-                this.sendToast('success', '保存成功', `内容已自动保存到:\n${result.path}`);
+            // auto_save - 保存到指定文件
+            if (savePath) {
+                // 已在 confirm-dialog 中通过 IPC 保存
+                this.sendToast('success', '保存成功', `内容已追加到:\n${savePath}`);
             } else {
-                this.sendToast('error', '保存失败', result.error || '请检查配置');
+                // 兼容旧逻辑：保存到知识库
+                const saveBody = [
+                    '原始文本:',
+                    finalText,
+                    '',
+                    'AI 解释:',
+                    explanationText || 'AI 解释生成失败或为空'
+                ].join('\n');
+
+                const result = await this.saveToKnowledgeBase(saveBody, '用户选中的文字（原文+解释）');
+                if (result.success) {
+                    this.sendToast('success', '保存成功', `内容已自动保存到:\n${result.path}`);
+                } else {
+                    this.sendToast('error', '保存失败', result.error || '请检查配置');
+                }
             }
 
         } catch (error) {

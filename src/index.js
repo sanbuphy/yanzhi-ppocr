@@ -8,7 +8,7 @@ const metadataManager = require('./utils/MetadataManager');
 const { askAI, readPdf, searchArxiv, downloadArxivPdf } = require('./utils/AIProvider');
 
 // 引入 Agent 智能处理模块
-const { processInstruction, getAgent } = require('./agent');
+const { processInstruction, getAgent, initAgent } = require('./agent');
 
 // 解决 Windows 控制台中文乱码问题
 if (process.platform === 'win32') {
@@ -111,6 +111,10 @@ app.whenReady().then(() => {
   workspaceScanner = new WorkspaceScanner(dataDir);
   console.log('✅ 工作区扫描器已初始化（等待激活工作区）');
 
+  // 初始化 Agent（传入工作区扫描器）
+  initAgent(workspaceScanner);
+  console.log('✅ Agent 已连接工作区扫描器');
+
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   app.on('activate', () => {
@@ -123,9 +127,15 @@ app.whenReady().then(() => {
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
+// 修复：只有主窗口确实被销毁时才退出，防止编辑器窗口关闭意外触发应用退出
 app.on('window-all-closed', () => {
+  const mainWindowExists = mainWindow && !mainWindow.isDestroyed();
+
   if (process.platform !== 'darwin') {
-    app.quit();
+    // 只有在主窗口确实被销毁时才退出
+    if (!mainWindowExists) {
+      app.quit();
+    }
   }
 });
 

@@ -8,7 +8,8 @@ const { spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
-const { BrowserWindow, ipcMain, shell } = require('electron');
+const { BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { getAgent } = require('../agent/index');
 
 class WebToPdf {
     constructor(mainWindow, hotkeyManager = null) {
@@ -306,9 +307,25 @@ class WebToPdf {
             this.confirmDialog.close();
         }
 
+        // 执行智能分类
+        let classifyResult = null;
+        try {
+            const agent = getAgent();
+            classifyResult = await agent.classify({
+                content: pdfPath,
+                contentType: 'pdf'
+            });
+        } catch (e) {
+            console.error('[PDF] 智能分类失败:', e);
+            classifyResult = {
+                success: false,
+                error: e.message || '分类失败'
+            };
+        }
+
         this.confirmDialog = new BrowserWindow({
-            width: 500,
-            height: 320,
+            width: 520,
+            height: 380,
             parent: this.mainWindow,
             modal: true,
             frame: false,
@@ -328,27 +345,95 @@ class WebToPdf {
         this.confirmDialog.webContents.on('did-finish-load', () => {
             this.confirmDialog.webContents.send('dialog:data', {
                 path: pdfPath,
-                title: title
+                title: title,
+                classifyResult: classifyResult
             });
         });
 
         // 监听对话框事件
         const confirmHandler = (event) => {
-            this.confirmDialog?.close();
+            try {
+                this.confirmDialog?.close();
+            } catch (e) {
+                console.error('[PDF] 确认操作出错:', e);
+            }
         };
 
-        const openFolderHandler = (event) => {
-            // 打开文件夹并选中文件
-            shell.showItemInFolder(pdfPath);
-            this.confirmDialog?.close();
+        const saveHandler = async (event, { sourcePath, targetPath }) => {
+            try {
+                // 确保目标目录存在
+                const targetDir = path.dirname(targetPath);
+                if (!fs.existsSync(targetDir)) {
+                    fs.mkdirSync(targetDir, { recursive: true });
+                }
+
+                // 移动或复制文件
+                if (sourcePath !== targetPath) {
+                    fs.copyFileSync(sourcePath, targetPath);
+                    // 删除原文件（移动）
+                    fs.unlinkSync(sourcePath);
+                }
+
+                // 通知保存成功
+                this.confirmDialog?.webContents.send('dialog:save-result', {
+                    success: true,
+                    path: targetPath
+                });
+            } catch (e) {
+                console.error('[PDF] 保存失败:', e);
+                this.confirmDialog?.webContents.send('dialog:save-result', {
+                    success: false,
+                    error: e.message
+                });
+            }
+        };
+
+        const openFolderHandler = (event, filePath) => {
+            try {
+                // 打开文件夹并选中文件
+                shell.showItemInFolder(filePath);
+                this.confirmDialog?.close();
+            } catch (e) {
+                console.error('[PDF] 打开文件夹出错:', e);
+            }
+        };
+
+        const cancelHandler = (event) => {
+            try {
+                this.confirmDialog?.close();
+            } catch (e) {
+                console.error('[PDF] 取消操作出错:', e);
+            }
+        };
+
+        const browseFolderHandler = async (event) => {
+            try {
+                const result = await dialog.showOpenDialog(this.confirmDialog, {
+                    title: '选择保存位置',
+                    properties: ['openDirectory', 'createDirectory']
+                });
+                if (result && result.filePaths && result.filePaths.length > 0) {
+                    this.confirmDialog?.webContents.send('dialog:browse-result', {
+                        selectedPath: result.filePaths[0]
+                    });
+                }
+            } catch (e) {
+                console.error('[PDF] 浏览文件夹出错:', e);
+            }
         };
 
         ipcMain.once('pdf-confirm:confirm', confirmHandler);
+        ipcMain.once('pdf-confirm:save', saveHandler);
         ipcMain.once('pdf-confirm:open-folder', openFolderHandler);
+        ipcMain.once('pdf-confirm:cancel', cancelHandler);
+        ipcMain.once('pdf-confirm:browse-folder', browseFolderHandler);
 
         this.confirmDialog.on('closed', () => {
             ipcMain.removeListener('pdf-confirm:confirm', confirmHandler);
+            ipcMain.removeListener('pdf-confirm:save', saveHandler);
             ipcMain.removeListener('pdf-confirm:open-folder', openFolderHandler);
+            ipcMain.removeListener('pdf-confirm:cancel', cancelHandler);
+            ipcMain.removeListener('pdf-confirm:browse-folder', browseFolderHandler);
             this.confirmDialog = null;
         });
     }
@@ -518,15 +603,22 @@ class WebToPdf {
         dialog.show();
 
         // 监听用户提交
-        const handler = (event, url) => {
+        const submitHandler = (event, url) => {
             dialog.close();
             this.handleUserUrl(url);
-            ipcMain.removeListener('pdf-url-dialog:submit', handler);
         };
 
-        ipcMain.once('pdf-url-dialog:submit', handler);
+        const cancelHandler = () => {
+            dialog.close();
+            this.handleUserUrl('');
+        };
+
+        ipcMain.once('pdf-url-dialog:submit', submitHandler);
+        ipcMain.once('pdf-url-dialog:cancel', cancelHandler);
 
         dialog.on('closed', () => {
+            ipcMain.removeListener('pdf-url-dialog:submit', submitHandler);
+            ipcMain.removeListener('pdf-url-dialog:cancel', cancelHandler);
             if (!this.isProcessing) {
                 this.sendToast('close_persistent', null, null);
             }

@@ -56,12 +56,12 @@
       flex-direction: column;
       height: calc(100% - 34px);
       padding: 16px;
-      gap: 12px;
+      gap: 10px;
     }
 
     .title {
       margin: 0;
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 700;
       letter-spacing: 0.4px;
     }
@@ -69,7 +69,7 @@
     .subtitle {
       margin: 0;
       color: var(--muted);
-      font-size: 13px;
+      font-size: 12px;
     }
 
     .panels {
@@ -77,7 +77,7 @@
       flex-direction: column;
       flex: 1;
       min-height: 0;
-      gap: 10px;
+      gap: 8px;
     }
 
     .panel {
@@ -85,46 +85,107 @@
       flex-direction: column;
       flex: 1;
       min-height: 0;
-      gap: 6px;
+      gap: 4px;
     }
 
     .panel-title {
       margin: 0;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 11px;
       letter-spacing: 0.3px;
     }
 
     .preview {
       flex: 1;
       border: 1px solid var(--line);
-      border-radius: 10px;
+      border-radius: 8px;
       background: var(--panel);
-      padding: 12px;
+      padding: 10px;
       overflow: auto;
       white-space: pre-wrap;
       word-break: break-word;
       line-height: 1.5;
-      font-size: 13px;
+      font-size: 12px;
       color: var(--text);
       resize: none;
       outline: none;
       font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
     }
 
+    .save-section {
+      margin-top: 4px;
+    }
+
+    .save-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .save-input {
+      flex: 1;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 11px;
+      color: var(--text);
+      outline: none;
+      font-family: "Segoe UI", monospace;
+    }
+
+    .save-input:focus {
+      border-color: var(--accent);
+    }
+
+    .save-input::placeholder {
+      color: var(--muted);
+    }
+
+    .browse-btn {
+      background: var(--secondary);
+      border: none;
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: var(--text);
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .browse-btn:hover {
+      background: var(--secondary-hover);
+    }
+
+    .classify-info {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 4px;
+      padding: 4px 8px;
+      background: rgba(34, 164, 111, 0.1);
+      border-radius: 4px;
+      border-left: 3px solid var(--accent);
+    }
+
+    .classify-info.error {
+      background: rgba(229, 115, 115, 0.1);
+      border-left-color: #e57373;
+      color: #e57373;
+    }
+
     .actions {
       display: flex;
       justify-content: flex-end;
-      gap: 10px;
+      gap: 8px;
       -webkit-app-region: no-drag;
     }
 
     button {
       border: none;
-      border-radius: 8px;
-      padding: 9px 14px;
+      border-radius: 6px;
+      padding: 8px 12px;
       color: #fff;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       transition: background-color 0.15s ease;
@@ -158,6 +219,29 @@
     .btn-save:hover:not(:disabled) {
       background: var(--accent-hover);
     }
+
+    /* Toast 提示 */
+    .toast {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.9);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      z-index: 1000;
+      text-align: center;
+    }
+
+    .toast.success {
+      background: rgba(34, 164, 111, 0.95);
+    }
+
+    .toast.error {
+      background: rgba(229, 115, 115, 0.95);
+    }
   </style>
 </head>
 <body>
@@ -169,20 +253,28 @@
     <h1 class="title">已捕获文字</h1>
     <p class="subtitle">上方为原文，下方为 AI 解释</p>
     <div class="panels">
-      <div class="panel">
+      <div class="panel" style="flex: 0.8;">
         <p class="panel-title">原始文本</p>
         <textarea id="originalText" class="preview" readonly placeholder="暂无原始文本"></textarea>
       </div>
-      <div class="panel">
+      <div class="panel" style="flex: 1;">
         <p class="panel-title">AI 解释</p>
         <textarea id="explanationText" class="preview" readonly placeholder="正在生成 AI 解释..."></textarea>
       </div>
+    </div>
+    <div class="save-section">
+      <p class="panel-title">保存到文件</p>
+      <div class="save-row">
+        <input type="text" id="savePath" class="save-input" placeholder="选择或输入 .md/.txt 文件路径">
+        <button class="browse-btn" id="browseBtn">浏览...</button>
+      </div>
+      <div class="classify-info" id="classifyInfo"></div>
     </div>
     <div class="actions">
       <button id="cancel" class="btn-cancel">取消</button>
       <button id="copyText" class="btn-copy">复制文本</button>
       <button id="copyExplanation" class="btn-copy">复制解释</button>
-      <button id="autoSave" class="btn-save">自动保存</button>
+      <button id="autoSave" class="btn-save">保存到文件</button>
     </div>
   </div>
 

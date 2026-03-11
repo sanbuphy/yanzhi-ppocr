@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF 保存成功 - 研知科研助手</title>
+    <title>PDF 保存确认 - 研知科研助手</title>
     <style>
         * {
             margin: 0;
@@ -13,21 +13,23 @@
 
         body {
             font-family: "Microsoft YaHei", -apple-system, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1a222b 0%, #11151a 100%);
             height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             overflow: hidden;
+            color: #f3f7fb;
         }
 
         .container {
-            background: white;
-            border-radius: 16px;
-            padding: 28px 32px;
+            background: #1a222b;
+            border: 1px solid #2b3948;
+            border-radius: 12px;
+            padding: 24px 28px;
             width: 100%;
-            max-width: 460px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 480px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
         }
 
         .header {
@@ -36,80 +38,178 @@
         }
 
         .header .icon {
-            font-size: 42px;
+            font-size: 36px;
             margin-bottom: 8px;
         }
 
         .header h1 {
-            color: #22c55e;
-            font-size: 20px;
-            margin-bottom: 6px;
+            color: #22a46f;
+            font-size: 18px;
+            margin-bottom: 4px;
         }
 
         .header p {
-            color: #666;
-            font-size: 13px;
+            color: #9cb0c3;
+            font-size: 12px;
         }
 
-        .path-info {
-            background: #f8f9fa;
-            padding: 14px 16px;
-            border-radius: 8px;
-            margin-bottom: 18px;
-            word-break: break-all;
-            font-size: 13px;
-            color: #555;
+        .info-section {
+            margin-bottom: 16px;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #9cb0c3;
+            margin-bottom: 6px;
         }
 
         .page-title {
-            color: #333;
+            color: #f3f7fb;
             font-weight: 500;
-            margin-bottom: 6px;
             font-size: 14px;
+            margin-bottom: 12px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            background: #232d38;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid #2b3948;
         }
 
-        .file-path {
-            color: #888;
+        .path-section {
+            margin-bottom: 16px;
+        }
+
+        .path-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .path-input {
+            flex: 1;
+            background: #232d38;
+            border: 1px solid #2b3948;
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 12px;
+            color: #f3f7fb;
+            outline: none;
+            font-family: "Segoe UI", monospace;
+        }
+
+        .path-input:focus {
+            border-color: #22a46f;
+        }
+
+        .path-input.error {
+            color: #e57373;
+        }
+
+        .browse-btn {
+            background: #3a4d62;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 14px;
+            color: #f3f7fb;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .browse-btn:hover {
+            background: #4a627b;
+        }
+
+        .classify-info {
             font-size: 11px;
-            line-height: 1.5;
+            color: #9cb0c3;
+            margin-top: 6px;
+            padding: 6px 10px;
+            background: rgba(34, 164, 111, 0.1);
+            border-radius: 4px;
+            border-left: 3px solid #22a46f;
+        }
+
+        .classify-info.error {
+            background: rgba(229, 115, 115, 0.1);
+            border-left-color: #e57373;
+            color: #e57373;
         }
 
         .btn-group {
             display: flex;
             gap: 12px;
             justify-content: flex-end;
+            margin-top: 20px;
         }
 
         .btn {
-            padding: 12px 24px;
+            padding: 10px 20px;
             border: none;
-            border-radius: 8px;
-            font-size: 14px;
+            border-radius: 6px;
+            font-size: 13px;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            background: linear-gradient(135deg, #22a46f 0%, #1e8a5c 100%);
             color: white;
         }
 
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(34, 197, 94, 0.4);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(34, 164, 111, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
         .btn-secondary {
-            background: #3b82f6;
-            color: white;
+            background: #3a4d62;
+            color: #f3f7fb;
         }
 
         .btn-secondary:hover {
-            background: #2563eb;
+            background: #4a627b;
+        }
+
+        .btn-cancel {
+            background: #5c3340;
+            color: #f3f7fb;
+        }
+
+        .btn-cancel:hover {
+            background: #734052;
+        }
+
+        /* Toast 提示 */
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: #fff;
+            padding: 16px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1000;
+            text-align: center;
+        }
+
+        .toast.success {
+            background: rgba(34, 164, 111, 0.95);
+        }
+
+        .toast.error {
+            background: rgba(229, 115, 115, 0.95);
         }
 
         /* 允许拖拽窗口 */
@@ -117,7 +217,7 @@
             -webkit-app-region: drag;
         }
 
-        .btn-group, .path-info {
+        .info-section, .path-section, .btn-group {
             -webkit-app-region: no-drag;
         }
     </style>
@@ -125,47 +225,142 @@
 <body>
     <div class="container">
         <div class="header">
-            <div class="icon">✅</div>
-            <h1>PDF 已保存</h1>
-            <p>网页已成功转换为 PDF 文件</p>
+            <div class="icon">📄</div>
+            <h1>PDF 已生成</h1>
+            <p>请确认保存位置</p>
         </div>
 
-        <div class="path-info">
+        <div class="info-section">
+            <div class="info-label">网页标题</div>
             <div class="page-title" id="pageTitle">加载中...</div>
-            <div class="file-path" id="filePath">加载中...</div>
+        </div>
+
+        <div class="path-section">
+            <div class="info-label">保存路径</div>
+            <div class="path-row">
+                <input type="text" id="savePath" class="path-input" placeholder="请选择保存位置">
+                <button class="browse-btn" id="browseBtn">浏览...</button>
+            </div>
+            <div class="classify-info" id="classifyInfo"></div>
         </div>
 
         <div class="btn-group">
-            <button class="btn btn-primary" id="confirm-btn">确认</button>
-            <button class="btn btn-secondary" id="open-folder-btn">打开文件夹</button>
+            <button class="btn btn-cancel" id="cancelBtn">取消</button>
+            <button class="btn btn-primary" id="saveBtn">保存</button>
         </div>
     </div>
 
     <script>
-        const { ipcRenderer } = require('electron');
+        const { ipcRenderer, dialog } = require('electron');
+        const path = require('path');
+
+        const pageTitleEl = document.getElementById('pageTitle');
+        const savePathEl = document.getElementById('savePath');
+        const classifyInfoEl = document.getElementById('classifyInfo');
+        const browseBtn = document.getElementById('browseBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+
+        let sourcePath = '';
+        let currentSavePath = '';
 
         // 接收数据
         ipcRenderer.on('dialog:data', (event, data) => {
-            document.getElementById('pageTitle').textContent = data.title || '网页';
-            document.getElementById('filePath').textContent = data.path;
+            pageTitleEl.textContent = data.title || '网页';
+            sourcePath = data.path;
+            currentSavePath = data.path;
+
+            // 显示分类结果
+            const classifyResult = data.classifyResult;
+            if (classifyResult && classifyResult.success) {
+                currentSavePath = classifyResult.savePath;
+                savePathEl.value = classifyResult.savePath;
+                savePathEl.classList.remove('error');
+
+                // 显示分类信息
+                const folderName = classifyResult.folderName || path.basename(path.dirname(classifyResult.savePath));
+                classifyInfoEl.textContent = `智能推荐保存到「${folderName}」文件夹（置信度: ${Math.round((classifyResult.confidence || 0.5) * 100)}%）`;
+                classifyInfoEl.classList.remove('error');
+            } else {
+                savePathEl.value = data.path;
+                savePathEl.classList.remove('error');
+
+                // 显示分类错误
+                classifyInfoEl.textContent = classifyResult?.error || '无法智能分类，将使用默认路径';
+                classifyInfoEl.classList.add('error');
+            }
         });
 
-        // 确认按钮
-        document.getElementById('confirm-btn').addEventListener('click', () => {
-            ipcRenderer.send('pdf-confirm:confirm');
+        // 浏览按钮
+        browseBtn.addEventListener('click', async () => {
+            // 通过主进程打开文件夹选择对话框
+            ipcRenderer.send('pdf-confirm:browse-folder');
         });
 
-        // 打开文件夹按钮
-        document.getElementById('open-folder-btn').addEventListener('click', () => {
-            ipcRenderer.send('pdf-confirm:open-folder');
+        // 监听浏览结果
+        ipcRenderer.on('dialog:browse-result', (event, result) => {
+            if (result && result.selectedPath) {
+                const fileName = path.basename(currentSavePath || sourcePath);
+                currentSavePath = path.join(result.selectedPath, fileName);
+                savePathEl.value = currentSavePath;
+                savePathEl.classList.remove('error');
+            }
+        });
+
+        // 保存按钮
+        saveBtn.addEventListener('click', async () => {
+            const targetPath = savePathEl.value.trim();
+            if (!targetPath) {
+                savePathEl.classList.add('error');
+                return;
+            }
+
+            saveBtn.disabled = true;
+            saveBtn.textContent = '保存中...';
+
+            ipcRenderer.send('pdf-confirm:save', {
+                sourcePath: sourcePath,
+                targetPath: targetPath
+            });
+        });
+
+        // 监听保存结果
+        ipcRenderer.on('dialog:save-result', (event, result) => {
+            if (result.success) {
+                showToast('保存成功！', 'success');
+                setTimeout(() => {
+                    ipcRenderer.send('pdf-confirm:open-folder', result.path);
+                }, 800);
+            } else {
+                showToast(result.error || '保存失败', 'error');
+                saveBtn.disabled = false;
+                saveBtn.textContent = '保存';
+            }
+        });
+
+        // 取消按钮
+        cancelBtn.addEventListener('click', () => {
+            ipcRenderer.send('pdf-confirm:cancel');
         });
 
         // ESC 关闭
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                ipcRenderer.send('pdf-confirm:confirm');
+                ipcRenderer.send('pdf-confirm:cancel');
             }
         });
+
+        // Toast 提示
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 2000);
+        }
     </script>
 </body>
 </html>

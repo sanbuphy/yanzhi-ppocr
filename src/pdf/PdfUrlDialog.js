@@ -9,6 +9,8 @@ class PdfUrlDialog {
     constructor(mainWindow) {
         this.mainWindow = mainWindow;
         this.window = null;
+        this.submitListener = null;
+        this.cancelListener = null;
     }
 
     /**
@@ -42,10 +44,45 @@ class PdfUrlDialog {
         this.window.center();
         this.window.show();
 
+        this.registerWindowIpc();
+
         // 窗口关闭时清理
         this.window.on('closed', () => {
+            this.cleanupWindowIpc();
             this.window = null;
         });
+    }
+
+    registerWindowIpc() {
+        this.cleanupWindowIpc();
+
+        this.submitListener = (event, url) => {
+            if (!this.window || this.window.isDestroyed()) return;
+            if (!this.window.webContents || this.window.webContents.isDestroyed()) return;
+            if (event.sender !== this.window.webContents) return;
+            this.sendUrl(String(url || '').trim());
+        };
+
+        this.cancelListener = (event) => {
+            if (!this.window || this.window.isDestroyed()) return;
+            if (!this.window.webContents || this.window.webContents.isDestroyed()) return;
+            if (event.sender !== this.window.webContents) return;
+            this.close();
+        };
+
+        ipcMain.on('pdf-url-dialog:submit', this.submitListener);
+        ipcMain.on('pdf-url-dialog:cancel', this.cancelListener);
+    }
+
+    cleanupWindowIpc() {
+        if (this.submitListener) {
+            ipcMain.removeListener('pdf-url-dialog:submit', this.submitListener);
+            this.submitListener = null;
+        }
+        if (this.cancelListener) {
+            ipcMain.removeListener('pdf-url-dialog:cancel', this.cancelListener);
+            this.cancelListener = null;
+        }
     }
 
     /**
@@ -53,6 +90,7 @@ class PdfUrlDialog {
      */
     close() {
         if (this.window && !this.window.isDestroyed()) {
+            this.cleanupWindowIpc();
             this.window.close();
         }
     }
@@ -73,13 +111,15 @@ class PdfUrlDialog {
 // 注册 IPC 处理
 function registerIpc(pdfManager) {
     ipcMain.on('pdf-url-dialog:submit', (event, url) => {
-        if (pdfManager) {
+        if (pdfManager && url) {
             pdfManager.handleUserUrl(url);
         }
     });
 
     ipcMain.on('pdf-url-dialog:cancel', () => {
-        // 用户取消
+        if (pdfManager) {
+            pdfManager.handleUserUrl('');
+        }
     });
 }
 

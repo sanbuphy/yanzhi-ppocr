@@ -3,10 +3,11 @@
  * 提供画笔、高亮、文字等编辑功能
  */
 
-const { BrowserWindow, screen, ipcMain } = require('electron');
+const { BrowserWindow, screen, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { AIClient } = require('./aiClient');
+const { getAgent } = require('../agent/index');
 
 const IMAGE_EXPLANATION_TIMEOUT_MS = 60000; // 60 秒超时
 const AI_TIMEOUT_TEXT = 'AI请求超时';
@@ -17,6 +18,8 @@ class EditorWindow {
         this.screenshotBuffer = null;
         this.selection = null;
         this.onClose = null;
+        this.isClosing = false;
+        this.cancelListener = null;
         this.aiClient = new AIClient("你是一个图像分析和解读助手，专门对截图、图表、公式等进行详细解读。");
     }
 
@@ -95,9 +98,16 @@ class EditorWindow {
         });
 
         this.window.on('closed', () => {
+            this.cleanupIpcHandlers();
+            this.isClosing = false;
             if (typeof this.onClose === 'function') {
-                this.onClose();
+                try {
+                    this.onClose();
+                } catch (error) {
+                    console.error('编辑器关闭回调执行失败:', error);
+                }
             }
+            this.onClose = null;
             this.window = null;
         });
 
@@ -126,49 +136,98 @@ class EditorWindow {
     registerIpcHandlers() {
         const saveChannel = 'editor:save-image';
         const aiChannel = 'editor:ai-explain';
-        const explainSaveChannel = 'editor:explain-and-save';
+        const aiClassifyChannel = 'editor:ai-explain-and-classify';
+        const saveToFolderChannel = 'editor:save-to-folder';
+        const browseFolderChannel = 'editor:browse-folder';
         const finishChannel = 'editor:finish';
         const cancelChannel = 'editor:cancel';
 
         // 保证单实例窗口下重复打开时不会残留旧 handler
         ipcMain.removeHandler(saveChannel);
         ipcMain.removeHandler(aiChannel);
-        ipcMain.removeHandler(explainSaveChannel);
+        ipcMain.removeHandler(aiClassifyChannel);
+        ipcMain.removeHandler(saveToFolderChannel);
+        ipcMain.removeHandler(browseFolderChannel);
         ipcMain.removeHandler(finishChannel);
-        ipcMain.removeAllListeners(cancelChannel);
+        if (this.cancelListener) {
+            ipcMain.removeListener(cancelChannel, this.cancelListener);
+            this.cancelListener = null;
+        }
 
-        // 保存图片到文件
+        const isFromEditorWindow = (event) => {
+            return !!(
+                this.window &&
+                !this.window.isDestroyed() &&
+                this.window.webContents &&
+                !this.window.webContents.isDestroyed() &&
+                event.sender === this.window.webContents
+            );
+        };
+
+        // 保存图片到临时文件
         ipcMain.handle(saveChannel, async (event, base64) => {
+            if (!isFromEditorWindow(event)) return '';
             return await this.saveImage(base64);
         });
 
-        // AI 解释图片
+        // AI 解释图片（仅 OCR + AI，不含分类）
         ipcMain.handle(aiChannel, async (event, base64) => {
+            if (!isFromEditorWindow(event)) return '';
             return await this.aiExplain(base64);
         });
 
-        // AI 解释并入库
-        ipcMain.handle(explainSaveChannel, async (event, base64) => {
-            const explanation = await this.aiExplain(base64);
-            const explanationText = (explanation && typeof explanation === 'object')
-                ? (explanation.finalAnswer || '')
-                : (explanation || '');
-            const result = await this.saveToKnowledgeBase(base64, explanationText);
-            // 不在这里关闭窗口，让前端显示 Toast 后再关闭
-            return { explanation, result };
+        // AI 解释 + 智能分类
+        ipcMain.handle(aiClassifyChannel, async (event, base64) => {
+            if (!isFromEditorWindow(event)) return { ocrText: '', aiExplanation: '', classifyResult: null };
+            return await this.aiExplainAndClassify(base64);
+        });
+
+        // 保存图片到指定文件夹
+        ipcMain.handle(saveToFolderChannel, async (event, { base64, savePath, ocrText, aiExplanation }) => {
+            if (!isFromEditorWindow(event)) return { success: false, error: '无效窗口请求' };
+            return await this.saveToFolder(base64, savePath, ocrText, aiExplanation);
+        });
+
+        // 浏览选择文件夹
+        ipcMain.handle(browseFolderChannel, async (event) => {
+            if (!isFromEditorWindow(event)) return { canceled: true, filePaths: [] };
+            return await dialog.showOpenDialog(this.window, {
+                title: '选择保存位置',
+                properties: ['openDirectory', 'createDirectory']
+            });
         });
 
         // 完成编辑（复制到剪贴板）
         ipcMain.handle(finishChannel, async (event, base64) => {
+            if (!isFromEditorWindow(event)) return false;
             await this.copyToClipboard(base64);
             this.close();
             return true;
         });
 
         // 取消编辑
-        ipcMain.on(cancelChannel, () => {
-            this.close();
-        });
+        this.cancelListener = (event) => {
+            try {
+                if (!isFromEditorWindow(event)) return;
+                this.close();
+            } catch (e) {
+                console.error('取消操作出错:', e);
+            }
+        };
+        ipcMain.on(cancelChannel, this.cancelListener);
+    }
+
+    cleanupIpcHandlers() {
+        ipcMain.removeHandler('editor:save-image');
+        ipcMain.removeHandler('editor:ai-explain');
+        ipcMain.removeHandler('editor:ai-explain-and-classify');
+        ipcMain.removeHandler('editor:save-to-folder');
+        ipcMain.removeHandler('editor:browse-folder');
+        ipcMain.removeHandler('editor:finish');
+        if (this.cancelListener) {
+            ipcMain.removeListener('editor:cancel', this.cancelListener);
+            this.cancelListener = null;
+        }
     }
 
     /**
@@ -232,135 +291,103 @@ class EditorWindow {
     }
 
     /**
-     * 保存图片到知识库（调用 Python 选择路径）
-     * @param {string} base64
-     * @param {string|null} explanation
+     * AI 解释 + 智能分类
+     * @param {string} base64 - 图片 base64
+     * @returns {Promise<object>} { ocrText, aiExplanation, classifyResult }
      */
-    async saveToKnowledgeBase(base64, explanation = null) {
-        const imageBuffer = Buffer.from(base64.replace(/^data:image\/png;base64,/, ''), 'base64');
-        const tempDir = path.join(__dirname, '../../temp');
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
-        }
-
-        const tempPath = path.join(tempDir, `screenshot_${Date.now()}.png`);
-        fs.writeFileSync(tempPath, imageBuffer);
-
+    async aiExplainAndClassify(base64) {
+        let tempPath = null;
         try {
-            return await this.callPythonClassifier(tempPath, explanation);
+            // 1. 保存临时文件用于 AI 和分类
+            tempPath = await this.saveImage(base64);
+
+            // 2. 执行 OCR + AI 解读
+            const explainPromise = this.aiClient.askWithOcrAudit(
+                "请对这张图片进行详细解读和分析。\n\n要求：\n1. 描述图片的主要内容和核心信息\n2. 如果包含公式、代码或图表，请解释其含义和作用\n3. 如果是技术内容，请提供易于理解的解释\n4. 总结该图片对学习/研究的价值",
+                tempPath,
+                0.5,
+                2000
+            );
+
+            const timeoutPromise = new Promise((resolve) => {
+                setTimeout(() => resolve(AI_TIMEOUT_TEXT), IMAGE_EXPLANATION_TIMEOUT_MS);
+            });
+            const explanation = await Promise.race([explainPromise, timeoutPromise]);
+
+            if (explanation === AI_TIMEOUT_TEXT) {
+                return { ocrText: '', aiExplanation: AI_TIMEOUT_TEXT, classifyResult: null };
+            }
+
+            // 提取 OCR 文本和 AI 解释
+            const ocrText = (explanation && typeof explanation === 'object')
+                ? (explanation.ocrStructuredMarkdown || '')
+                : '';
+            const aiExplanation = (explanation && typeof explanation === 'object')
+                ? (explanation.finalAnswer || '')
+                : String(explanation || '');
+
+            // 3. 调用 ClassifySkill 进行智能分类
+            let classifyResult = null;
+            try {
+                const agent = getAgent();
+                classifyResult = await agent.classify({
+                    content: tempPath,
+                    contentType: 'image'
+                });
+            } catch (classifyError) {
+                console.error('智能分类失败:', classifyError);
+                classifyResult = {
+                    success: false,
+                    error: classifyError.message || '分类失败'
+                };
+            }
+
+            return { ocrText, aiExplanation, classifyResult };
+
+        } catch (error) {
+            console.error('AI 解释 + 分类失败:', error);
+            throw error;
         } finally {
-            if (fs.existsSync(tempPath)) {
-                fs.unlinkSync(tempPath);
-            }
+            // 不删除临时文件，因为分类可能需要用它保存
+            // 分类成功后会移动文件到目标位置
         }
     }
 
     /**
-     * 获取 Python 可执行文件路径
+     * 保存图片到指定文件夹
+     * @param {string} base64 - 图片 base64
+     * @param {string} savePath - 目标保存路径
+     * @param {string} ocrText - OCR 文本
+     * @param {string} aiExplanation - AI 解释
+     * @returns {Promise<object>} { success, path, error }
      */
-    _getPythonPath() {
-        const { execSync } = require('child_process');
-        // 常见的 Python 路径
-        const candidates = [
-            '/usr/local/bin/python3',
-            '/usr/bin/python3',
-            '/opt/homebrew/bin/python3',
-            '/Library/Frameworks/Python.framework/Versions/3.10/bin/python3',
-            '/Library/Frameworks/Python.framework/Versions/3.11/bin/python3',
-            '/Library/Frameworks/Python.framework/Versions/3.12/bin/python3',
-            'python3',
-            'python'
-        ];
-        
-        // 尝试使用 which 命令查找
+    async saveToFolder(base64, savePath, ocrText, aiExplanation) {
         try {
-            const result = execSync('which python3 2>/dev/null || which python 2>/dev/null', {
-                encoding: 'utf-8',
-                timeout: 5000,
-                shell: '/bin/zsh'
-            }).trim();
-            if (result && fs.existsSync(result)) {
-                return result;
+            // 确保目标目录存在
+            const targetDir = path.dirname(savePath);
+            if (!fs.existsSync(targetDir)) {
+                fs.mkdirSync(targetDir, { recursive: true });
             }
-        } catch (e) {
-            // which 命令失败，继续尝试候选路径
+
+            // 保存图片
+            const base64Data = base64.replace(/^data:image\/png;base64,/, '');
+            fs.writeFileSync(savePath, Buffer.from(base64Data, 'base64'));
+
+            // 创建元数据文件
+            const metaPath = savePath + '.meta.json';
+            const metaData = {
+                ocrText: ocrText || '',
+                aiExplanation: aiExplanation || '',
+                createdAt: new Date().toISOString()
+            };
+            fs.writeFileSync(metaPath, JSON.stringify(metaData, null, 2), 'utf-8');
+
+            console.log(`图片已保存: ${savePath}`);
+            return { success: true, path: savePath };
+        } catch (error) {
+            console.error('保存图片失败:', error);
+            return { success: false, error: error.message };
         }
-        
-        // 遍历候选路径
-        for (const candidate of candidates) {
-            if (fs.existsSync(candidate)) {
-                return candidate;
-            }
-        }
-        
-        throw new Error('未找到 Python 解释器，请安装 Python3');
-    }
-
-    /**
-     * 调用 Python 分类器
-     */
-    async callPythonClassifier(imagePath, explanation) {
-        const { spawn } = require('child_process');
-        const toolsDir = path.join(__dirname, '../../tools');
-        
-        // 获取 Python 路径
-        let pythonPath;
-        try {
-            pythonPath = this._getPythonPath();
-        } catch (e) {
-            return { success: false, error: e.message };
-        }
-
-        return new Promise((resolve, reject) => {
-            const pythonCode = `
-import sys
-import json
-sys.path.insert(0, r'${toolsDir.replace(/\\/g, '/')}')
-
-try:
-    from choose_to_save import ContentManager, InputType
-    from PIL import Image
-
-    manager = ContentManager()
-    img = Image.open(r'${imagePath.replace(/\\/g, '/')}')
-
-    description = ${explanation ? JSON.stringify(explanation) : 'None'}
-    result = manager.save_content(InputType.IMAGE, img, description=description)
-
-    print("RESULT:" + json.dumps({"success": True, "path": result} if result else {"success": False, "error": "保存失败"}))
-except Exception as e:
-    print("RESULT:" + json.dumps({"success": False, "error": str(e)}))
-`;
-
-            const proc = spawn(pythonPath, ['-c', pythonCode], {
-                cwd: toolsDir,
-                env: {
-                    ...process.env,
-                    PYTHONIOENCODING: 'utf-8',
-                    PYTHONUTF8: '1'
-                }
-            });
-
-            let output = '';
-            proc.stdout.on('data', (data) => {
-                output += data.toString('utf-8');
-            });
-
-            proc.on('close', () => {
-                const match = output.match(/RESULT:(.+)/);
-                if (match) {
-                    try {
-                        resolve(JSON.parse(match[1]));
-                    } catch (e) {
-                        reject(new Error('解析 Python 结果失败'));
-                    }
-                } else {
-                    reject(new Error('Python 脚本无输出'));
-                }
-            });
-
-            proc.on('error', reject);
-        });
     }
 
     /**
@@ -379,15 +406,14 @@ except Exception as e:
      * 关闭编辑器窗口
      */
     close() {
-        // 移除 IPC 处理
-        if (this.window) {
-            ipcMain.removeHandler('editor:save-image');
-            ipcMain.removeHandler('editor:ai-explain');
-            ipcMain.removeHandler('editor:explain-and-save');
-            ipcMain.removeHandler('editor:finish');
-            ipcMain.removeAllListeners('editor:cancel');
+        if (this.isClosing) return;
+        this.isClosing = true;
+        this.cleanupIpcHandlers();
 
+        if (this.window && !this.window.isDestroyed()) {
             this.window.close();
+        } else {
+            this.isClosing = false;
         }
     }
 }

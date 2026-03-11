@@ -8,24 +8,41 @@ const ScheduleSkill = require('./ScheduleSkill');
  * 整合分类、总结、推荐、定时任务四大技能
  */
 class YanzhiAgent {
-    constructor(configPath = null) {
-        this.classifySkill = new ClassifySkill(configPath);
+    constructor(workspaceScanner = null) {
+        this.classifySkill = new ClassifySkill(workspaceScanner);
         this.summarizeSkill = new SummarizeSkill();
         this.recommendSkill = new RecommendSkill();
-        this.scheduleSkill = new ScheduleSkill(configPath);
+        this.scheduleSkill = new ScheduleSkill(null);
 
         console.log('✅ 研知 Agent 已初始化');
         console.log('   可用技能：classify, summarize, recommend, schedule');
     }
 
     /**
+     * 设置工作区扫描器
+     * @param {Object} scanner - 工作区扫描器实例
+     */
+    setWorkspaceScanner(scanner) {
+        this.classifySkill.setWorkspaceScanner(scanner);
+    }
+
+    /**
      * 文献分类技能
-     * @param {string} content - 待分类的内容
-     * @param {string} contentType - 内容类型 'text' | 'image' | 'pdf'
+     * @param {string|Object} content - 待分类的内容或选项对象
+     * @param {string} contentType - 内容类型 'text' | 'image' | 'pdf' | 'auto'
+     * @param {string} fileName - 可选，文件名（用于博客判断）
      * @returns {Promise<Object>} 分类结果
      */
-    async classify(content, contentType = 'text') {
-        return this.classifySkill.classify(content, contentType);
+    async classify(content, contentType = 'text', fileName = null) {
+        // 支持新旧两种调用方式
+        if (typeof content === 'object') {
+            return this.classifySkill.classify(content);
+        }
+        return this.classifySkill.classify({
+            content: content,
+            contentType: contentType,
+            fileName: fileName
+        });
     }
 
     /**
@@ -86,7 +103,11 @@ class YanzhiAgent {
         // 分类技能
         if (['分类', '归类', '保存', 'classify'].some(kw => instructionLower.includes(kw))) {
             if (context.content) {
-                const result = await this.classify(context.content, context.contentType || 'text');
+                const result = await this.classify({
+                    content: context.content,
+                    contentType: context.contentType || 'auto',
+                    fileName: context.fileName || null
+                });
                 return { skill: 'classify', result };
             }
             return { error: '缺少内容参数，请提供 content' };
@@ -129,6 +150,19 @@ class YanzhiAgent {
 let defaultAgent = null;
 
 /**
+ * 初始化 Agent（设置工作区扫描器）
+ * @param {Object} workspaceScanner - 工作区扫描器实例
+ */
+function initAgent(workspaceScanner) {
+    if (!defaultAgent) {
+        defaultAgent = new YanzhiAgent(workspaceScanner);
+    } else {
+        defaultAgent.setWorkspaceScanner(workspaceScanner);
+    }
+    return defaultAgent;
+}
+
+/**
  * 获取默认 Agent 实例
  * @returns {YanzhiAgent}
  */
@@ -152,6 +186,7 @@ function processInstruction(instruction, context = {}) {
 module.exports = {
     YanzhiAgent,
     getAgent,
+    initAgent,
     processInstruction,
     ARXIV_CATEGORIES,
     // 导出各个技能类，方便单独使用
