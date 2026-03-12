@@ -5,6 +5,9 @@
 
 const { BrowserWindow, ipcMain, dialog } = require('electron');
 
+// Windows 平台使用 destroy() 避免触发 window-all-closed 事件
+const FORCE_DESTROY_ON_CLOSE = process.platform === 'win32';
+
 class PdfUrlDialog {
     constructor(mainWindow) {
         this.mainWindow = mainWindow;
@@ -91,7 +94,11 @@ class PdfUrlDialog {
     close() {
         if (this.window && !this.window.isDestroyed()) {
             this.cleanupWindowIpc();
-            this.window.close();
+            if (FORCE_DESTROY_ON_CLOSE) {
+                this.window.destroy();
+            } else {
+                this.window.close();
+            }
         }
     }
 

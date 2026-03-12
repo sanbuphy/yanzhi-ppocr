@@ -5,6 +5,9 @@
 
 const { BrowserWindow, screen } = require('electron');
 
+// Windows 平台使用 destroy() 避免触发 window-all-closed 事件
+const FORCE_DESTROY_ON_CLOSE = process.platform === 'win32';
+
 class ScreenshotWindow {
     constructor() {
         this.window = null;
@@ -98,7 +101,11 @@ class ScreenshotWindow {
      */
     close() {
         if (this.window && !this.window.isDestroyed()) {
-            this.window.close();
+            if (FORCE_DESTROY_ON_CLOSE) {
+                this.window.destroy();
+            } else {
+                this.window.close();
+            }
             this.window = null;
         }
     }

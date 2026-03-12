@@ -447,6 +447,66 @@ body {
   }
 }
 
+/* 已登录状态样式 */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.user-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(144, 238, 144, 0.5);
+}
+
+#userName {
+  font-size: 18px;
+  color: #fff;
+  font-weight: 500;
+}
+
+.logged-in-buttons {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.back-main-button {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
+  border: none;
+  padding: 14px 40px;
+  font-size: 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.back-main-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+.logout-button {
+  background: transparent;
+  color: #aaa;
+  border: 1px solid #555;
+  padding: 12px 24px;
+  font-size: 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logout-button:hover {
+  color: #fff;
+  border-color: #fff;
+}
+
 @media (max-width: 768px) {
   .hero-section {
     padding: 60px 20px;
@@ -489,5 +549,11 @@ body {
   .hero-actions {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .logged-in-buttons {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
   }
 }

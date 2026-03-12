@@ -18,6 +18,7 @@ class ScreenshotManager {
         this.editorWindow = null;
         this.isProcessing = false;
         this.contentManager = null; // 用于保存截图到知识库
+        this.log = (...args) => console.log('[ScreenshotManager]', ...args);
 
         this.registerIpcHandlers();
     }
@@ -54,6 +55,7 @@ class ScreenshotManager {
      * 开始截图流程
      */
     async startCapture() {
+        this.log('startCapture begin', { isProcessing: this.isProcessing });
         if (this.isProcessing) {
             this.sendToast('busy', '请稍候', '正在处理截图，请稍后再试');
             return;
@@ -66,9 +68,11 @@ class ScreenshotManager {
             // 1. 显示截图选区窗口
             this.screenshotWindow = new ScreenshotWindow();
             const selection = await this.screenshotWindow.startCapture();
+            this.log('startCapture selection', { selection });
 
             if (!selection) {
                 // 用户取消
+                this.log('startCapture canceled by user');
                 this.isProcessing = false;
                 this.sendToast('close_persistent', null, null);
                 return;
@@ -82,11 +86,13 @@ class ScreenshotManager {
             // 3. 显示编辑器
             this.editorWindow = new EditorWindow();
             this.editorWindow.create(screenshot, selection, () => {
+                this.log('editor onClose callback', { isProcessingBeforeReset: this.isProcessing });
                 this.isProcessing = false;
                 this.sendToast('close_persistent', null, null);
             });
 
         } catch (error) {
+            this.log('startCapture error', { message: error.message, stack: error.stack });
             console.error('截图失败:', error);
             this.sendToast('error', '截图失败', error.message);
             this.isProcessing = false;

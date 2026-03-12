@@ -20,8 +20,22 @@
             智能截图捕捉、网页转PDF、文献推荐、AI解释,全方位辅助您的科研工作
           </p>
           <div class="hero-actions">
-            <button class="login-button" onclick="window.location.href='login/login.html'">点击登陆</button>
-            <span class="register-link">没有账号?<a href="register/register.html">点击进行注册</a></span>
+            <!-- 未登录状态 -->
+            <div id="loggedOutActions">
+              <button class="login-button" onclick="window.location.href='login/login.html'">点击登陆</button>
+              <span class="register-link">没有账号?<a href="register/register.html">点击进行注册</a></span>
+            </div>
+            <!-- 已登录状态 -->
+            <div id="loggedInActions" style="display: none;">
+              <div class="user-info">
+                <img id="userAvatar" src="../img/user.png" alt="Avatar" class="user-avatar" />
+                <span id="userName">用户</span>
+              </div>
+              <div class="logged-in-buttons">
+                <button class="back-main-button" onclick="window.location.href='main/main.html'">返回主界面</button>
+                <button class="logout-button" id="logoutBtn">退出登录</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="hero-illustration">
@@ -136,5 +150,6 @@
         </div>
       </div>
     </footer>
+    <script src="index-logic.js"></script>
   </body>
 </html>

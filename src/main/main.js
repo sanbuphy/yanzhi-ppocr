@@ -766,7 +766,22 @@ async function sendAIAnalysisRequest(filePath, fileName, fileType, prompt) {
     const aiMsgDiv = document.createElement('div');
     aiMsgDiv.className = 'message assistant';
     if (aiResult.success) {
-      aiMsgDiv.innerHTML = `<div class="message-content">${renderMarkdown(aiResult.response)}</div>`;
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'message-content';
+      contentDiv.innerHTML = renderMarkdown(aiResult.response);
+
+      // 为外部链接添加点击处理，在默认浏览器中打开
+      contentDiv.querySelectorAll('.external-link').forEach(link => {
+        link.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const url = link.dataset.url;
+          if (url) {
+            await window.electronAPI.shell.openExternal(url);
+          }
+        });
+      });
+
+      aiMsgDiv.appendChild(contentDiv);
     } else {
       aiMsgDiv.innerHTML = `<div class="message-content" style="color: #ff6b6b;">AI 分析失败: ${aiResult.error}</div>`;
     }
@@ -1239,8 +1254,14 @@ function renderMarkdown(markdown) {
   // 删除线 (~~text~~)
   html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
   
-  // 链接 [text](url)
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  // 链接 [text](url) - 为外部链接添加特殊类，使用 shell.openExternal 在默认浏览器打开
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
+    // 检测是否是外部链接（http/https）
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return `<a href="#" class="external-link" data-url="${url}">${text}</a>`;
+    }
+    return `<a href="${url}">${text}</a>`;
+  });
   
   // 水平线 (--- 或 ***)
   html = html.replace(/^---$/gm, '<hr>');
@@ -1337,6 +1358,26 @@ function renderMarkdown(markdown) {
   html = html.replace(/\n{3,}/g, '\n\n');
   
   return html;
+}
+
+/**
+ * 渲染 Markdown 并绑定外部链接点击事件
+ * @param {string} markdown - Markdown 内容
+ * @param {HTMLElement} container - 要渲染到的容器元素
+ */
+function renderMarkdownWithLinks(markdown, container) {
+  container.innerHTML = renderMarkdown(markdown);
+
+  // 为外部链接添加点击处理，在默认浏览器中打开
+  container.querySelectorAll('.external-link').forEach(link => {
+    link.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const url = link.dataset.url;
+      if (url) {
+        await window.electronAPI.shell.openExternal(url);
+      }
+    });
+  });
 }
 
 // Setup event listeners
@@ -2051,8 +2092,14 @@ function formatAgentResult(result) {
       if (papers.length === 0) return '未找到相关论文';
       let msg = `📚 找到 ${papers.length} 篇相关论文：\n\n`;
       papers.forEach((p, i) => {
-        msg += `**${i + 1}. ${p.title}**\n`;
-        msg += `   作者: ${p.authors?.slice(0, 3).join(', ') || '未知'}\n`;
+        msg += `**${i + 1}. ${p.titleCn || p.title}**\n`;
+        if (p.titleCn && p.titleCn !== p.title) {
+          msg += `   *${p.title}*\n`;
+        }
+        msg += `   作者: ${p.authorsDisplay || '未知'}\n`;
+        if (p.abstractCn) {
+          msg += `   摘要: ${p.abstractCn.substring(0, 150)}${p.abstractCn.length > 150 ? '...' : ''}\n`;
+        }
         if (p.pdfUrl) msg += `   [PDF](${p.pdfUrl})\n`;
         msg += '\n';
       });
@@ -2129,6 +2176,17 @@ function renderMessage(message) {
   
   // 使用更强大的全局 renderMarkdown 函数
   content.innerHTML = renderMarkdown(message.text);
+
+  // 为外部链接添加点击处理，在默认浏览器中打开
+  content.querySelectorAll('.external-link').forEach(link => {
+    link.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const url = link.dataset.url;
+      if (url) {
+        await window.electronAPI.shell.openExternal(url);
+      }
+    });
+  });
   
   const time = document.createElement('div');
   time.className = 'message-time';

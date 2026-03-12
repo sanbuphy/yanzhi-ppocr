@@ -151,12 +151,20 @@ class ArxivClient {
      * 搜索 Arxiv 论文
      * @param {string} query - 搜索关键词
      * @param {number} maxResults - 最大结果数
+     * @param {string} sortBy - 排序方式：'relevance', 'submittedDate', 'lastUpdatedDate'
      * @returns {Promise<{success: boolean, papers?: Array, error?: string}>}
      */
-    async search(query, maxResults = 5) {
+    async search(query, maxResults = 5, sortBy = 'relevance') {
         return new Promise((resolve) => {
-            const searchQuery = encodeURIComponent(query);
-            const url = `https://export.arxiv.org/api/query?search_query=all:${searchQuery}&sortBy=submittedDate&sortOrder=descending&max_results=${maxResults}`;
+            // 检测查询是否已包含 arXiv 字段前缀 (如 all:, cat:, ti:, au: 等)
+            const hasFieldPrefix = /^(all:|cat:|ti:|au:|abs:|jr:|key:|sr:|su:)/i.test(query);
+
+            // 如果已有字段前缀，直接使用；否则添加 all: 前缀
+            const searchQuery = hasFieldPrefix
+                ? encodeURIComponent(query)
+                : `all:${encodeURIComponent(query)}`;
+
+            const url = `https://export.arxiv.org/api/query?search_query=${searchQuery}&sortBy=${sortBy}&sortOrder=descending&max_results=${maxResults}`;
 
             console.log('[Arxiv] 搜索 URL:', url);
 
@@ -376,9 +384,12 @@ async function readPdf(filePath, maxPages = 5) {
 
 /**
  * 搜索 Arxiv
+ * @param {string} query - 搜索关键词
+ * @param {number} maxResults - 最大结果数
+ * @param {string} sortBy - 排序方式：'relevance', 'submittedDate', 'lastUpdatedDate'
  */
-async function searchArxiv(query, maxResults = 5) {
-    return await arxivClient.search(query, maxResults);
+async function searchArxiv(query, maxResults = 5, sortBy = 'relevance') {
+    return await arxivClient.search(query, maxResults, sortBy);
 }
 
 /**

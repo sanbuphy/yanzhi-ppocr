@@ -17,6 +17,7 @@ let explanationChannel = '';
 let classifyChannel = '';
 let browseChannel = '';
 let browseResultChannel = '';
+let saveToFileChannel = '';
 let submitted = false;
 let explanationReady = false;
 let cancelSent = false;
@@ -82,8 +83,8 @@ function submit(action) {
       }
     });
 
-    // 发送保存请求
-    ipcRenderer.send('textcapture:save-to-file', {
+    // 发送保存请求（使用动态 channel）
+    ipcRenderer.send(saveToFileChannel, {
       filePath: savePath,
       text: originalText,
       explanation: explanationText
@@ -138,6 +139,7 @@ ipcRenderer.on('textcapture:confirm-data', (event, payload) => {
   classifyChannel = String(payload?.classifyChannel || '');
   browseChannel = String(payload?.browseChannel || '');
   browseResultChannel = String(payload?.browseResultChannel || '');
+  saveToFileChannel = String(payload?.saveToFileChannel || '');
   cancelSent = false;
 
   originalTextEl.value = originalText;

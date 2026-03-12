@@ -13,6 +13,8 @@ const { getAgent } = require('../agent/index');
 
 const TEXT_EXPLANATION_TIMEOUT_MS = 10000;
 const AI_TIMEOUT_TEXT = 'AI请求超时';
+// Windows 平台使用 destroy() 避免触发 window-all-closed 事件
+const FORCE_DESTROY_ON_CLOSE = process.platform === 'win32';
 
 class TextCapture {
     constructor(mainWindow, hotkeyManager = null) {
@@ -80,7 +82,11 @@ class TextCapture {
                     }
                     finish(action, finalText, savePath);
                     if (this.confirmWindow && !this.confirmWindow.isDestroyed()) {
-                        this.confirmWindow.close();
+                        if (FORCE_DESTROY_ON_CLOSE) {
+                            this.confirmWindow.destroy();
+                        } else {
+                            this.confirmWindow.close();
+                        }
                     }
                 } catch (e) {
                     console.error('提交操作出错:', e);
@@ -91,7 +97,11 @@ class TextCapture {
                 try {
                     finish('cancel', '');
                     if (this.confirmWindow && !this.confirmWindow.isDestroyed()) {
-                        this.confirmWindow.close();
+                        if (FORCE_DESTROY_ON_CLOSE) {
+                            this.confirmWindow.destroy();
+                        } else {
+                            this.confirmWindow.close();
+                        }
                     }
                 } catch (e) {
                     console.error('取消操作出错:', e);
@@ -121,9 +131,17 @@ class TextCapture {
 
             const onSaveToFile = async (event, { filePath, text, explanation }) => {
                 try {
-                    // 读取现有文件内容
+                    const dirPath = path.dirname(filePath);
+
+                    // 确保目录存在
+                    if (!fs.existsSync(dirPath)) {
+                        fs.mkdirSync(dirPath, { recursive: true });
+                    }
+
+                    // 检查文件是否存在
+                    const fileExists = fs.existsSync(filePath);
                     let existingContent = '';
-                    if (fs.existsSync(filePath)) {
+                    if (fileExists) {
                         existingContent = fs.readFileSync(filePath, 'utf-8');
                     }
 
@@ -137,7 +155,14 @@ class TextCapture {
                         second: '2-digit'
                     });
 
-                    const newContent = `${existingContent ? existingContent + '\n' : ''}---
+                    // 如果文件不存在，先创建带标题的文件
+                    let header = '';
+                    if (!fileExists) {
+                        const fileName = path.basename(filePath, path.extname(filePath));
+                        header = `# ${fileName}\n\n`;
+                    }
+
+                    const newContent = `${existingContent ? existingContent + '\n' : header}---
 时间: ${timestamp}
 原始文本:
 ${text}
@@ -208,7 +233,8 @@ ${explanation}
                         explanationChannel,
                         classifyChannel,
                         browseChannel,
-                        browseResultChannel
+                        browseResultChannel,
+                        saveToFileChannel
                     });
 
                     // 生成 AI 解释
@@ -673,7 +699,11 @@ except Exception as e:
      */
     destroy() {
         if (this.confirmWindow && !this.confirmWindow.isDestroyed()) {
-            this.confirmWindow.close();
+            if (FORCE_DESTROY_ON_CLOSE) {
+                this.confirmWindow.destroy();
+            } else {
+                this.confirmWindow.close();
+            }
         }
         if (this.hotkeyManager) {
             this.hotkeyManager.unregister('Ctrl+B');

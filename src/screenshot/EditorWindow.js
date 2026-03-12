@@ -11,6 +11,7 @@ const { getAgent } = require('../agent/index');
 
 const IMAGE_EXPLANATION_TIMEOUT_MS = 60000; // 60 秒超时
 const AI_TIMEOUT_TEXT = 'AI请求超时';
+const DIAGNOSTIC_FORCE_DESTROY_ON_CLOSE = process.platform === 'win32';
 
 class EditorWindow {
     constructor() {
@@ -20,6 +21,8 @@ class EditorWindow {
         this.onClose = null;
         this.isClosing = false;
         this.cancelListener = null;
+        this.tempImagePath = null; // 追踪临时图片路径
+        this.log = (...args) => console.log('[EditorWindow]', ...args);
         this.aiClient = new AIClient("你是一个图像分析和解读助手，专门对截图、图表、公式等进行详细解读。");
     }
 
@@ -29,6 +32,10 @@ class EditorWindow {
      * @param {{x, y, width, height}} selection - 选区坐标
      */
     create(screenshot, selection, onClose = null) {
+        this.log('create called', {
+            selection,
+            hasOnClose: typeof onClose === 'function'
+        });
         this.screenshotBuffer = screenshot;
         this.selection = selection;
         this.onClose = onClose;
@@ -98,6 +105,9 @@ class EditorWindow {
         });
 
         this.window.on('closed', () => {
+            this.log('window closed callback', {
+                hadOnClose: typeof this.onClose === 'function'
+            });
             this.cleanupIpcHandlers();
             this.isClosing = false;
             if (typeof this.onClose === 'function') {
@@ -109,6 +119,18 @@ class EditorWindow {
             }
             this.onClose = null;
             this.window = null;
+        });
+
+        this.window.webContents.on('render-process-gone', (event, details) => {
+            this.log('webContents render-process-gone', details);
+        });
+
+        this.window.webContents.on('unresponsive', () => {
+            this.log('webContents unresponsive');
+        });
+
+        this.window.webContents.on('destroyed', () => {
+            this.log('webContents destroyed');
         });
 
         // 注册 IPC 处理
@@ -134,6 +156,7 @@ class EditorWindow {
      * 注册 IPC 处理
      */
     registerIpcHandlers() {
+        this.log('registerIpcHandlers');
         const saveChannel = 'editor:save-image';
         const aiChannel = 'editor:ai-explain';
         const aiClassifyChannel = 'editor:ai-explain-and-classify';
@@ -208,7 +231,14 @@ class EditorWindow {
         // 取消编辑
         this.cancelListener = (event) => {
             try {
-                if (!isFromEditorWindow(event)) return;
+                const senderMatch = isFromEditorWindow(event);
+                this.log('editor:cancel received', {
+                    senderMatch,
+                    isClosing: this.isClosing,
+                    hasWindow: !!this.window,
+                    windowDestroyed: this.window ? this.window.isDestroyed() : null
+                });
+                if (!senderMatch) return;
                 this.close();
             } catch (e) {
                 console.error('取消操作出错:', e);
@@ -218,6 +248,7 @@ class EditorWindow {
     }
 
     cleanupIpcHandlers() {
+        this.log('cleanupIpcHandlers');
         ipcMain.removeHandler('editor:save-image');
         ipcMain.removeHandler('editor:ai-explain');
         ipcMain.removeHandler('editor:ai-explain-and-classify');
@@ -300,6 +331,8 @@ class EditorWindow {
         try {
             // 1. 保存临时文件用于 AI 和分类
             tempPath = await this.saveImage(base64);
+            // 保存临时文件路径用于后续清理
+            this.tempImagePath = tempPath;
 
             // 2. 执行 OCR + AI 解读
             const explainPromise = this.aiClient.askWithOcrAudit(
@@ -383,6 +416,14 @@ class EditorWindow {
             fs.writeFileSync(metaPath, JSON.stringify(metaData, null, 2), 'utf-8');
 
             console.log(`图片已保存: ${savePath}`);
+
+            // 清理临时文件
+            if (this.tempImagePath && fs.existsSync(this.tempImagePath)) {
+                fs.unlinkSync(this.tempImagePath);
+                console.log('临时图片已清理:', this.tempImagePath);
+                this.tempImagePath = null;
+            }
+
             return { success: true, path: savePath };
         } catch (error) {
             console.error('保存图片失败:', error);
@@ -406,12 +447,39 @@ class EditorWindow {
      * 关闭编辑器窗口
      */
     close() {
+        this.log('close called', {
+            isClosing: this.isClosing,
+            hasWindow: !!this.window,
+            windowDestroyed: this.window ? this.window.isDestroyed() : null
+        });
         if (this.isClosing) return;
         this.isClosing = true;
         this.cleanupIpcHandlers();
 
         if (this.window && !this.window.isDestroyed()) {
-            this.window.close();
+            this.log('close dispatch', {
+                strategy: DIAGNOSTIC_FORCE_DESTROY_ON_CLOSE ? 'destroy' : 'close'
+            });
+
+            setTimeout(() => {
+                this.log('close heartbeat +200ms', {
+                    hasWindow: !!this.window,
+                    windowDestroyed: this.window ? this.window.isDestroyed() : null
+                });
+            }, 200);
+
+            setTimeout(() => {
+                this.log('close heartbeat +800ms', {
+                    hasWindow: !!this.window,
+                    windowDestroyed: this.window ? this.window.isDestroyed() : null
+                });
+            }, 800);
+
+            if (DIAGNOSTIC_FORCE_DESTROY_ON_CLOSE) {
+                this.window.destroy();
+            } else {
+                this.window.close();
+            }
         } else {
             this.isClosing = false;
         }

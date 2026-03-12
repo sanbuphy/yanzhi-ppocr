@@ -92,3 +92,4 @@ typings/
 out/
 workspaces/
 temp/
+.claude/

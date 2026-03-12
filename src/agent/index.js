@@ -60,10 +60,11 @@ class YanzhiAgent {
      * 论文推荐技能
      * @param {string} query - 搜索关键词
      * @param {number} maxResults - 最大结果数
+     * @param {Object} context - 上下文参数（可包含文章内容等）
      * @returns {Promise<Array>} 论文列表
      */
-    async recommend(query, maxResults = 5) {
-        return this.recommendSkill.recommend(query, maxResults);
+    async recommend(query, maxResults = 5, context = {}) {
+        return this.recommendSkill.recommend(query, maxResults, context);
     }
 
     /**
@@ -113,10 +114,14 @@ class YanzhiAgent {
             return { error: '缺少内容参数，请提供 content' };
         }
 
-        // 推荐技能 - 降低“论文”关键词的侵略性，优先匹配更具体的意图
-        if (['推荐', '类似', '相关', 'recommend', 'arxiv'].some(kw => instructionLower.includes(kw)) || 
+        // 推荐技能 - 降低”论文”关键词的侵略性，优先匹配更具体的意图
+        if (['推荐', '类似', '相关', 'recommend', 'arxiv'].some(kw => instructionLower.includes(kw)) ||
             (instructionLower.includes('论文') && ['找', '搜', '查', '发现', '看到'].some(kw => instructionLower.includes(kw)))) {
-            const result = await this.recommend(context.query || instruction, context.maxResults || 5);
+            // 从指令中提取数量
+            const countMatch = instruction.match(/(\d+)\s*篇/);
+            const maxResults = countMatch ? Math.min(parseInt(countMatch[1]), 10) : 3;
+
+            const result = await this.recommend(context.query || instruction, maxResults, context);
             return { skill: 'recommend', result };
         }
 

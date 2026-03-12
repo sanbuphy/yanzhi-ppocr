@@ -82,5 +82,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Agent 智能处理
   agent: {
     process: (instruction, context) => ipcRenderer.invoke('agent:process', instruction, context),
+  },
+
+  // Shell 操作（在默认浏览器打开链接）
+  shell: {
+    openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   }
 });

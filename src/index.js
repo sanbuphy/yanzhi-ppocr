@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain, dialog, Notification, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Notification, globalShortcut, shell } = require('electron');
 const path = require('node:path');
 const { spawn } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const metadataManager = require('./utils/MetadataManager');
 
 // 引入原生 AI 服务模块
@@ -40,6 +41,71 @@ let textCaptureManager = null; // 文字捕获管理器
 let workspaceScanner = null;   // 工作区扫描器
 const WORKSPACE_SCAN_INTERVAL_MS = 120000;
 
+function resolveMainLogFile() {
+  try {
+    const logDir = path.join(app.getPath('userData'), 'logs');
+    return {
+      dir: logDir,
+      file: path.join(logDir, 'main-process.log')
+    };
+  } catch (error) {
+    const fallbackDir = path.join(__dirname, '..', 'temp', 'logs');
+    return {
+      dir: fallbackDir,
+      file: path.join(fallbackDir, 'main-process.log')
+    };
+  }
+}
+
+function createMainLogger() {
+  const safeStringify = (value) => {
+    try {
+      return JSON.stringify(value);
+    } catch (error) {
+      return String(value);
+    }
+  };
+
+  const write = (level, message, extra) => {
+    const target = resolveMainLogFile();
+    const line = [
+      new Date().toISOString(),
+      level,
+      message,
+      extra !== undefined ? safeStringify(extra) : ''
+    ].join(' | ') + os.EOL;
+
+    try {
+      if (!fs.existsSync(target.dir)) {
+        fs.mkdirSync(target.dir, { recursive: true });
+      }
+      fs.appendFileSync(target.file, line, 'utf8');
+    } catch (error) {
+      console.error('[MAIN][LOGGER] 写入日志失败:', error.message);
+    }
+
+    if (extra !== undefined) {
+      console.log('[MAIN]', level, message, extra);
+    } else {
+      console.log('[MAIN]', level, message);
+    }
+  };
+
+  return {
+    info: (message, extra) => write('INFO', message, extra),
+    warn: (message, extra) => write('WARN', message, extra),
+    error: (message, extra) => write('ERROR', message, extra),
+    filePath: () => resolveMainLogFile().file,
+  };
+}
+
+const mainLog = createMainLogger();
+mainLog.info('process-start', {
+  pid: process.pid,
+  platform: process.platform,
+  argv: process.argv,
+});
+
 // ================= 工具函数 =================
 
 
@@ -51,6 +117,9 @@ const createWindow = () => {
 
   if (isDevRuntime) {
     console.log('[Startup] Development mode detected, bypassing login page.');
+    mainLog.info('startup-mode', { mode: 'development', startupPage });
+  } else {
+    mainLog.info('startup-mode', { mode: 'production', startupPage });
   }
 
   // Create the browser window.
@@ -65,16 +134,22 @@ const createWindow = () => {
   });
 
   // Choose startup page by runtime mode.
+  mainLog.info('createWindow', { width: 1400, height: 900, startupPage });
   mainWindow.loadFile(startupPage);
 
   // Open the DevTools.
   mainWindow.webContents.openDevTools();
+
+  mainWindow.on('closed', () => {
+    mainLog.warn('mainWindow-closed');
+  });
 };
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+  mainLog.info('app-whenReady', { logFile: mainLog.filePath() });
   createWindow();
 
   // 初始化快捷键管理器
@@ -118,6 +193,7 @@ app.whenReady().then(() => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   app.on('activate', () => {
+    mainLog.info('app-activate', { windowCount: BrowserWindow.getAllWindows().length });
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
@@ -129,11 +205,25 @@ app.whenReady().then(() => {
 // explicitly with Cmd + Q.
 // 修复：只有主窗口确实被销毁时才退出，防止编辑器窗口关闭意外触发应用退出
 app.on('window-all-closed', () => {
+  const allWindows = BrowserWindow.getAllWindows();
   const mainWindowExists = mainWindow && !mainWindow.isDestroyed();
+
+  mainLog.warn('window-all-closed', {
+    mainWindowExists: !!mainWindowExists,
+    windowCount: allWindows.length,
+    urls: allWindows.map((win) => {
+      try {
+        return win.webContents.getURL();
+      } catch (error) {
+        return 'unknown';
+      }
+    }),
+  });
 
   if (process.platform !== 'darwin') {
     // 只有在主窗口确实被销毁时才退出
     if (!mainWindowExists) {
+      mainLog.warn('app-quit-called-by-window-all-closed');
       app.quit();
     }
   }
@@ -141,6 +231,7 @@ app.on('window-all-closed', () => {
 
 // 应用退出时清理资源
 app.on('will-quit', () => {
+  mainLog.warn('will-quit');
   if (workspaceScanner) {
     workspaceScanner.stop();
   }
@@ -155,7 +246,8 @@ app.on('will-quit', () => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  mainLog.warn('before-quit', { defaultPrevented: event.defaultPrevented });
   if (workspaceScanner) {
     workspaceScanner.stop();
   }
@@ -168,17 +260,52 @@ app.on('before-quit', () => {
   if (hotkeyManager) {
     hotkeyManager.unregisterAll();
   }
+});
+
+app.on('quit', (event, exitCode) => {
+  mainLog.warn('quit', { exitCode });
+});
+
+app.on('render-process-gone', (event, webContents, details) => {
+  mainLog.error('render-process-gone', {
+    reason: details && details.reason,
+    exitCode: details && details.exitCode,
+    url: (() => {
+      try {
+        return webContents.getURL();
+      } catch (error) {
+        return 'unknown';
+      }
+    })(),
+  });
+});
+
+app.on('child-process-gone', (event, details) => {
+  mainLog.error('child-process-gone', details);
 });
 
 // 处理进程信号（Ctrl+C 等）
 process.on('SIGINT', () => {
+  mainLog.warn('signal', { signal: 'SIGINT' });
   console.log('\n收到 SIGINT 信号，正在清理...');
   app.quit();
 });
 
 process.on('SIGTERM', () => {
+  mainLog.warn('signal', { signal: 'SIGTERM' });
   console.log('收到 SIGTERM 信号，正在清理...');
   app.quit();
+});
+
+process.on('uncaughtException', (error) => {
+  mainLog.error('uncaughtException', {
+    message: error && error.message,
+    stack: error && error.stack,
+  });
+});
+
+process.on('unhandledRejection', (reason) => {
+  mainLog.error('unhandledRejection', reason);
 });
 
 // ================= Toast 通知 IPC =================
@@ -1092,6 +1219,17 @@ ipcMain.handle('agent:process', async (event, instruction, context = {}) => {
     return { success: true, ...result };
   } catch (err) {
     console.error('[Agent] 处理失败:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 在默认浏览器中打开外部链接
+ipcMain.handle('shell:openExternal', async (event, url) => {
+  try {
+    await shell.openExternal(url);
+    return { success: true };
+  } catch (err) {
+    console.error('[Shell] 打开链接失败:', err);
     return { success: false, error: err.message };
   }
 });

@@ -11,6 +11,9 @@ const fs = require('fs');
 const { BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const { getAgent } = require('../agent/index');
 
+// Windows 平台使用 destroy() 避免触发 window-all-closed 事件
+const FORCE_DESTROY_ON_CLOSE = process.platform === 'win32';
+
 class WebToPdf {
     constructor(mainWindow, hotkeyManager = null) {
         this.mainWindow = mainWindow;
@@ -18,9 +21,35 @@ class WebToPdf {
         this.isProcessing = false;
         this.toolsDir = path.join(__dirname, '../../tools');
         this.confirmDialog = null;
+        this.tempPdfPath = null; // 追踪临时 PDF 路径
 
         // 延迟加载 puppeteer-core
         this.puppeteer = null;
+    }
+
+    /**
+     * 获取 temp 目录路径
+     */
+    getTempDir() {
+        const tempDir = path.join(this.toolsDir, '../temp');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+        return tempDir;
+    }
+
+    /**
+     * 清理临时 PDF 文件
+     */
+    _cleanupTempPdf(pdfPath) {
+        try {
+            if (pdfPath && fs.existsSync(pdfPath)) {
+                fs.unlinkSync(pdfPath);
+                console.log('[PDF] 已清理临时文件:', pdfPath);
+            }
+        } catch (e) {
+            console.error('[PDF] 清理临时文件失败:', e);
+        }
     }
 
     /**
@@ -257,15 +286,12 @@ class WebToPdf {
                 .replace(/[\\/*?:"<>|]/g, '')
                 .substring(0, 50);
 
-            // 确保 pdfs 目录存在
-            const pdfsDir = path.join(this.toolsDir, 'pdfs');
-            if (!fs.existsSync(pdfsDir)) {
-                fs.mkdirSync(pdfsDir, { recursive: true });
-            }
+            // 保存到 temp 目录
+            const tempDir = this.getTempDir();
 
             const timestamp = Date.now();
             const filename = `${safeTitle}_${timestamp}.pdf`;
-            const outputPath = path.join(pdfsDir, filename);
+            const outputPath = path.join(tempDir, filename);
 
             console.log('[PDF] 保存路径:', outputPath);
 
@@ -287,6 +313,9 @@ class WebToPdf {
             // 7. 断开连接（不关闭浏览器）
             browser.disconnect();
 
+            // 存储临时文件路径用于后续清理
+            this.tempPdfPath = outputPath;
+
             console.log('[PDF] PDF 保存成功:', outputPath);
             return { success: true, path: outputPath, title: title || '网页' };
 
@@ -304,7 +333,11 @@ class WebToPdf {
     async showConfirmDialog(pdfPath, title) {
         // 关闭之前的对话框
         if (this.confirmDialog && !this.confirmDialog.isDestroyed()) {
-            this.confirmDialog.close();
+            if (FORCE_DESTROY_ON_CLOSE) {
+                this.confirmDialog.destroy();
+            } else {
+                this.confirmDialog.close();
+            }
         }
 
         // 执行智能分类
@@ -353,7 +386,13 @@ class WebToPdf {
         // 监听对话框事件
         const confirmHandler = (event) => {
             try {
-                this.confirmDialog?.close();
+                if (this.confirmDialog && !this.confirmDialog.isDestroyed()) {
+                    if (FORCE_DESTROY_ON_CLOSE) {
+                        this.confirmDialog.destroy();
+                    } else {
+                        this.confirmDialog.close();
+                    }
+                }
             } catch (e) {
                 console.error('[PDF] 确认操作出错:', e);
             }
@@ -374,6 +413,9 @@ class WebToPdf {
                     fs.unlinkSync(sourcePath);
                 }
 
+                // 清理临时文件追踪
+                this.tempPdfPath = null;
+
                 // 通知保存成功
                 this.confirmDialog?.webContents.send('dialog:save-result', {
                     success: true,
@@ -392,7 +434,13 @@ class WebToPdf {
             try {
                 // 打开文件夹并选中文件
                 shell.showItemInFolder(filePath);
-                this.confirmDialog?.close();
+                if (this.confirmDialog && !this.confirmDialog.isDestroyed()) {
+                    if (FORCE_DESTROY_ON_CLOSE) {
+                        this.confirmDialog.destroy();
+                    } else {
+                        this.confirmDialog.close();
+                    }
+                }
             } catch (e) {
                 console.error('[PDF] 打开文件夹出错:', e);
             }
@@ -400,7 +448,17 @@ class WebToPdf {
 
         const cancelHandler = (event) => {
             try {
-                this.confirmDialog?.close();
+                // 清理临时文件
+                this._cleanupTempPdf(this.tempPdfPath);
+                this.tempPdfPath = null;
+
+                if (this.confirmDialog && !this.confirmDialog.isDestroyed()) {
+                    if (FORCE_DESTROY_ON_CLOSE) {
+                        this.confirmDialog.destroy();
+                    } else {
+                        this.confirmDialog.close();
+                    }
+                }
             } catch (e) {
                 console.error('[PDF] 取消操作出错:', e);
             }
@@ -472,13 +530,10 @@ class WebToPdf {
                     const timestamp = Date.now();
                     const filename = `${safeTitle}_${timestamp}.pdf`;
 
-                    // 确保目录存在
-                    const pdfsDir = path.join(this.toolsDir, 'pdfs');
-                    if (!fs.existsSync(pdfsDir)) {
-                        fs.mkdirSync(pdfsDir, { recursive: true });
-                    }
+                    // 保存到 temp 目录
+                    const tempDir = this.getTempDir();
 
-                    const outputPath = path.join(pdfsDir, filename);
+                    const outputPath = path.join(tempDir, filename);
 
                     // 保存为 PDF
                     await tempWindow.webContents.printToPDF({
@@ -496,6 +551,9 @@ class WebToPdf {
 
                     clearTimeout(timeout);
                     tempWindow.destroy();
+
+                    // 存储临时文件路径用于后续清理
+                    this.tempPdfPath = outputPath;
 
                     console.log('[PDF] Electron 保存成功:', outputPath);
                     resolve({ success: true, path: outputPath, title: title || '网页' });
@@ -604,12 +662,20 @@ class WebToPdf {
 
         // 监听用户提交
         const submitHandler = (event, url) => {
-            dialog.close();
+            if (FORCE_DESTROY_ON_CLOSE) {
+                dialog.destroy();
+            } else {
+                dialog.close();
+            }
             this.handleUserUrl(url);
         };
 
         const cancelHandler = () => {
-            dialog.close();
+            if (FORCE_DESTROY_ON_CLOSE) {
+                dialog.destroy();
+            } else {
+                dialog.close();
+            }
             this.handleUserUrl('');
         };
 
