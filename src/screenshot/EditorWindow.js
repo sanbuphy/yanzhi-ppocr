@@ -22,6 +22,7 @@ class EditorWindow {
         this.isClosing = false;
         this.cancelListener = null;
         this.tempImagePath = null; // 追踪临时图片路径
+        this.currentAbortController = null; // 当前请求的 AbortController
         this.log = (...args) => console.log('[EditorWindow]', ...args);
         this.aiClient = new AIClient("你是一个图像分析和解读助手，专门对截图、图表、公式等进行详细解读。");
     }
@@ -245,6 +246,20 @@ class EditorWindow {
             }
         };
         ipcMain.on(cancelChannel, this.cancelListener);
+
+        // 取消 AI 请求（不关闭窗口）
+        const cancelAiChannel = 'editor:cancel-ai';
+        ipcMain.removeHandler(cancelAiChannel);
+        ipcMain.handle(cancelAiChannel, (event) => {
+            if (!isFromEditorWindow(event)) return false;
+            this.log('editor:cancel-ai received, aborting current AI request');
+            if (this.currentAbortController) {
+                this.currentAbortController.abort();
+                this.currentAbortController = null;
+                return true;
+            }
+            return false;
+        });
     }
 
     cleanupIpcHandlers() {
@@ -255,6 +270,7 @@ class EditorWindow {
         ipcMain.removeHandler('editor:save-to-folder');
         ipcMain.removeHandler('editor:browse-folder');
         ipcMain.removeHandler('editor:finish');
+        ipcMain.removeHandler('editor:cancel-ai');
         if (this.cancelListener) {
             ipcMain.removeListener('editor:cancel', this.cancelListener);
             this.cancelListener = null;
@@ -289,32 +305,37 @@ class EditorWindow {
      */
     async aiExplain(base64) {
         let tempPath = null;
+        // 取消之前的请求
+        if (this.currentAbortController) {
+            this.currentAbortController.abort();
+        }
+        this.currentAbortController = new AbortController();
+        const signal = this.currentAbortController.signal;
+
         try {
             // 保存临时文件
             tempPath = await this.saveImage(base64 || `data:image/png;base64,${this.screenshotBuffer.toString('base64')}`);
 
-            // 调用 AI
-            const explainPromise = this.aiClient.askWithOcrAudit(
+            // 调用 AI（带超时和取消支持）
+            const explanation = await this.aiClient.askWithOcrAudit(
                 "请对这张图片进行详细解读和分析。\n\n要求：\n1. 描述图片的主要内容和核心信息\n2. 如果包含公式、代码或图表，请解释其含义和作用\n3. 如果是技术内容，请提供易于理解的解释\n4. 总结该图片对学习/研究的价值",
                 tempPath,
                 0.5,
-                2000
+                2000,
+                IMAGE_EXPLANATION_TIMEOUT_MS,
+                signal
             );
-
-            const timeoutPromise = new Promise((resolve) => {
-                setTimeout(() => resolve(AI_TIMEOUT_TEXT), IMAGE_EXPLANATION_TIMEOUT_MS);
-            });
-            const explanation = await Promise.race([explainPromise, timeoutPromise]);
-
-            if (explanation === AI_TIMEOUT_TEXT) {
-                return AI_TIMEOUT_TEXT;
-            }
 
             return explanation;
         } catch (error) {
+            // 如果是取消错误，返回超时提示
+            if (error.name === 'AbortError') {
+                return AI_TIMEOUT_TEXT;
+            }
             console.error('AI 解释失败:', error);
             throw error;
         } finally {
+            this.currentAbortController = null;
             if (tempPath && fs.existsSync(tempPath)) {
                 fs.unlinkSync(tempPath);
             }
@@ -328,27 +349,36 @@ class EditorWindow {
      */
     async aiExplainAndClassify(base64) {
         let tempPath = null;
+        // 取消之前的请求
+        if (this.currentAbortController) {
+            this.currentAbortController.abort();
+        }
+        this.currentAbortController = new AbortController();
+        const signal = this.currentAbortController.signal;
+
         try {
             // 1. 保存临时文件用于 AI 和分类
             tempPath = await this.saveImage(base64);
             // 保存临时文件路径用于后续清理
             this.tempImagePath = tempPath;
 
-            // 2. 执行 OCR + AI 解读
-            const explainPromise = this.aiClient.askWithOcrAudit(
-                "请对这张图片进行详细解读和分析。\n\n要求：\n1. 描述图片的主要内容和核心信息\n2. 如果包含公式、代码或图表，请解释其含义和作用\n3. 如果是技术内容，请提供易于理解的解释\n4. 总结该图片对学习/研究的价值",
-                tempPath,
-                0.5,
-                2000
-            );
-
-            const timeoutPromise = new Promise((resolve) => {
-                setTimeout(() => resolve(AI_TIMEOUT_TEXT), IMAGE_EXPLANATION_TIMEOUT_MS);
-            });
-            const explanation = await Promise.race([explainPromise, timeoutPromise]);
-
-            if (explanation === AI_TIMEOUT_TEXT) {
-                return { ocrText: '', aiExplanation: AI_TIMEOUT_TEXT, classifyResult: null };
+            // 2. 执行 OCR + AI 解读（带超时和取消支持）
+            let explanation;
+            try {
+                explanation = await this.aiClient.askWithOcrAudit(
+                    "请对这张图片进行详细解读和分析。\n\n要求：\n1. 描述图片的主要内容和核心信息\n2. 如果包含公式、代码或图表，请解释其含义和作用\n3. 如果是技术内容，请提供易于理解的解释\n4. 总结该图片对学习/研究的价值",
+                    tempPath,
+                    0.5,
+                    2000,
+                    IMAGE_EXPLANATION_TIMEOUT_MS,
+                    signal
+                );
+            } catch (error) {
+                // 如果是取消错误，返回超时提示
+                if (error.name === 'AbortError') {
+                    return { ocrText: '', aiExplanation: AI_TIMEOUT_TEXT, classifyResult: null };
+                }
+                throw error;
             }
 
             // 提取 OCR 文本和 AI 解释
@@ -381,6 +411,7 @@ class EditorWindow {
             console.error('AI 解释 + 分类失败:', error);
             throw error;
         } finally {
+            this.currentAbortController = null;
             // 不删除临时文件，因为分类可能需要用它保存
             // 分类成功后会移动文件到目标位置
         }
@@ -454,6 +485,13 @@ class EditorWindow {
         });
         if (this.isClosing) return;
         this.isClosing = true;
+
+        // 取消当前正在进行的 AI 请求
+        if (this.currentAbortController) {
+            this.currentAbortController.abort();
+            this.currentAbortController = null;
+        }
+
         this.cleanupIpcHandlers();
 
         if (this.window && !this.window.isDestroyed()) {

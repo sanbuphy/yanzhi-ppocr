@@ -234,11 +234,25 @@
             z-index: 2000;
         }
 
-        #loading span {
+        #loading .loading-content {
             background: rgba(0, 0, 0, 0.86);
-            padding: 12px 20px;
+            padding: 16px 24px;
             border-radius: 8px;
             border: 1px solid #4c4c4c;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #loading .loading-text {
+            font-size: 14px;
+            color: #fff;
+        }
+
+        #loading .loading-hint {
+            font-size: 12px;
+            color: #888;
         }
 
         #result-modal {
@@ -416,6 +430,11 @@
             border-color: rgba(244, 67, 54, 0.3);
         }
 
+        .toast.info {
+            background: rgba(25, 118, 210, 0.95);
+            border-color: rgba(33, 150, 243, 0.3);
+        }
+
         .toast .icon {
             font-size: 28px;
             margin-bottom: 8px;
@@ -529,8 +548,95 @@
             line-height: 1.55;
             max-height: 140px;
             overflow: auto;
-            white-space: pre-wrap;
             word-break: break-word;
+        }
+
+        /* Markdown Content Styles for save-preview */
+        .save-preview h1 {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 12px 0 8px;
+            color: #fff;
+        }
+
+        .save-preview h2 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 10px 0 6px;
+            color: #fff;
+        }
+
+        .save-preview h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin: 8px 0 4px;
+            color: #fff;
+        }
+
+        .save-preview p {
+            margin: 6px 0;
+            line-height: 1.5;
+        }
+
+        .save-preview ul,
+        .save-preview ol {
+            margin: 8px 0;
+            padding-left: 18px;
+        }
+
+        .save-preview li {
+            margin: 3px 0;
+            line-height: 1.4;
+        }
+
+        .save-preview code {
+            background: rgba(0, 120, 212, 0.15);
+            border-radius: 3px;
+            padding: 1px 4px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 12px;
+            color: #7dd3fc;
+        }
+
+        .save-preview pre {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 8px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+
+        .save-preview pre code {
+            background: transparent;
+            padding: 0;
+            color: #e8e8e8;
+        }
+
+        .save-preview blockquote {
+            border-left: 3px solid #0078d4;
+            padding-left: 10px;
+            margin: 8px 0;
+            color: #aaa;
+            font-style: italic;
+        }
+
+        .save-preview strong {
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .save-preview em {
+            font-style: italic;
+            color: #ccc;
+        }
+
+        .save-preview a {
+            color: #0078d4;
+            text-decoration: none;
+        }
+
+        .save-preview a:hover {
+            text-decoration: underline;
         }
 
         .save-path-row {
@@ -652,7 +758,12 @@
         </div>
     </div>
 
-    <div id="loading"><span>AI 正在处理中...</span></div>
+    <div id="loading">
+        <div class="loading-content">
+            <span class="loading-text">AI 正在处理中...</span>
+            <span class="loading-hint">按 ESC 取消</span>
+        </div>
+    </div>
 
     <div id="toast-container"></div>
 
@@ -1249,9 +1360,160 @@
         let dragSavePanelOffsetX = 0;
         let dragSavePanelOffsetY = 0;
 
+        // Markdown 渲染函数
+        function renderMarkdown(markdown) {
+            if (!markdown) return '';
+
+            let html = markdown;
+
+            // 先处理代码块
+            const codeBlocks = [];
+            html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
+                const id = `CODE_BLOCK_${codeBlocks.length}`;
+                codeBlocks.push({ id, code: code.trim() });
+                return id;
+            });
+
+            // 处理行内代码
+            const inlineCodes = [];
+            html = html.replace(/`([^`\n]+)`/g, (match, code) => {
+                const id = `INLINE_CODE_${inlineCodes.length}`;
+                inlineCodes.push({ id, code });
+                return id;
+            });
+
+            // 转义HTML特殊字符
+            html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+            // 恢复行内代码
+            inlineCodes.forEach(({ id, code }) => {
+                html = html.replace(id, `<code>${code}</code>`);
+            });
+
+            // 恢复代码块
+            codeBlocks.forEach(({ id, code }) => {
+                html = html.replace(id, `<pre><code>${code}</code></pre>`);
+            });
+
+            // 标题
+            html = html.replace(/^###### (.*$)/gm, '<h6>$1</h6>');
+            html = html.replace(/^##### (.*$)/gm, '<h5>$1</h5>');
+            html = html.replace(/^#### (.*$)/gm, '<h4>$1</h4>');
+            html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+
+            // 粗体
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+
+            // 斜体
+            html = html.replace(/\*([^*\n]+?)\*/g, (match, text) => {
+                if (match.includes('CODE_BLOCK') || match.includes('INLINE_CODE')) return match;
+                return '<em>' + text + '</em>';
+            });
+            html = html.replace(/_([^_\n]+?)_/g, (match, text) => {
+                if (match.includes('CODE_BLOCK') || match.includes('INLINE_CODE')) return match;
+                return '<em>' + text + '</em>';
+            });
+
+            // 删除线
+            html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+
+            // 链接
+            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+
+            // 水平线
+            html = html.replace(/^---$/gm, '<hr>');
+            html = html.replace(/^\*\*\*$/gm, '<hr>');
+
+            // 引用
+            const quoteLines = html.split('\n');
+            let inBlockquote = false;
+            let processedLines = [];
+
+            quoteLines.forEach(line => {
+                if (line.trim().startsWith('&gt; ')) {
+                    if (!inBlockquote) {
+                        processedLines.push('<blockquote>');
+                        inBlockquote = true;
+                    }
+                    processedLines.push(line.replace(/^&gt; /, ''));
+                } else {
+                    if (inBlockquote) {
+                        processedLines.push('</blockquote>');
+                        inBlockquote = false;
+                    }
+                    processedLines.push(line);
+                }
+            });
+            if (inBlockquote) processedLines.push('</blockquote>');
+            html = processedLines.join('\n');
+
+            // 处理列表和段落
+            const listLines = html.split('\n');
+            let result = [];
+            let listItems = [];
+            let currentListType = null;
+
+            const flushList = () => {
+                if (listItems.length > 0 && currentListType) {
+                    result.push(`<${currentListType}>${listItems.join('')}</${currentListType}>`);
+                    listItems = [];
+                    currentListType = null;
+                }
+            };
+
+            listLines.forEach((line) => {
+                const trimmed = line.trim();
+
+                const olMatch = trimmed.match(/^(\d+)\. (.+)$/);
+                if (olMatch) {
+                    if (currentListType !== 'ol') {
+                        flushList();
+                        currentListType = 'ol';
+                    }
+                    listItems.push(`<li>${olMatch[2]}</li>`);
+                    return;
+                }
+
+                const ulMatch = trimmed.match(/^[\*\-\+] (.+)$/);
+                if (ulMatch) {
+                    if (currentListType !== 'ul') {
+                        flushList();
+                        currentListType = 'ul';
+                    }
+                    listItems.push(`<li>${ulMatch[1]}</li>`);
+                    return;
+                }
+
+                flushList();
+
+                if (!trimmed) {
+                    result.push('');
+                } else if (trimmed.match(/^<(h[1-6]|pre|blockquote|hr|ul|ol|p)/)) {
+                    result.push(trimmed);
+                } else {
+                    result.push(`<p>${trimmed}</p>`);
+                }
+            });
+
+            flushList();
+
+            html = result.join('\n');
+
+            // 清理多余标签
+            html = html.replace(/<p><\/p>/g, '');
+            html = html.replace(/<p>(<h[1-6]|ul|ol|pre|blockquote|hr)/g, '$1');
+            html = html.replace(/(<\/h[1-6]|<\/ul>|<\/ol>|<\/pre>|<\/blockquote>|<\/hr>)<\/p>/g, '$1');
+            html = html.replace(/\n{3,}/g, '\n\n');
+
+            return html;
+        }
+
         function showSavePanel(ocrText, aiExplanation, classifyResult) {
-            saveOcrText.textContent = ocrText || '无 OCR 内容';
-            saveAiText.textContent = aiExplanation || '无 AI 解读';
+            saveOcrText.innerHTML = renderMarkdown(ocrText || '无 OCR 内容');
+            saveAiText.innerHTML = renderMarkdown(aiExplanation || '无 AI 解读');
 
             // 设置保存路径
             if (classifyResult && classifyResult.success && classifyResult.savePath) {
@@ -1280,13 +1542,17 @@
             savePanel.style.display = 'none';
         }
 
+        let isLoading = false; // 追踪加载状态
+
         document.getElementById('ai-btn').addEventListener('click', async () => {
             commitActiveTextInput();
+            isLoading = true;
             setLoading(true);
             try {
                 const result = await ipcRenderer.invoke('editor:ai-explain-and-classify', getCanvasDataUrl());
 
                 setLoading(false);
+                isLoading = false;
 
                 if (typeof result === 'string') {
                     // 超时或其他错误
@@ -1301,6 +1567,12 @@
 
             } catch (error) {
                 setLoading(false);
+                isLoading = false;
+                // 如果是取消错误，不显示错误弹窗
+                if (error.message && error.message.includes('取消')) {
+                    showToast('AI 解读已取消', 'info');
+                    return;
+                }
                 showResultModal('AI 解读失败', error.message || String(error), { hideCopy: true });
             }
         });
@@ -1381,7 +1653,14 @@
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
 
-            const icon = type === 'success' ? '✓' : '✗';
+            let icon;
+            if (type === 'success') {
+                icon = '✓';
+            } else if (type === 'info') {
+                icon = 'ℹ';
+            } else {
+                icon = '✗';
+            }
             toast.innerHTML = `
                 <div class="icon">${icon}</div>
                 <div class="message">${message}</div>
@@ -1445,12 +1724,22 @@
             isDraggingResultPanel = false;
         });
 
-        document.getElementById('cancel-btn').addEventListener('click', () => {
+        document.getElementById('cancel-btn').addEventListener('click', async () => {
             cancelActiveTextInput();
-            ipcRenderer.send('editor:cancel');
+            // 如果正在进行 AI 请求，取消请求而不是关闭窗口
+            if (isLoading) {
+                const cancelled = await ipcRenderer.invoke('editor:cancel-ai');
+                if (cancelled) {
+                    setLoading(false);
+                    isLoading = false;
+                    showToast('AI 解读已取消', 'info');
+                }
+            } else {
+                ipcRenderer.send('editor:cancel');
+            }
         });
 
-        document.addEventListener('keydown', (e) => {
+        document.addEventListener('keydown', async (e) => {
             if (e.ctrlKey && e.key.toLowerCase() === 's') {
                 e.preventDefault();
                 document.getElementById('finish-btn').click();
@@ -1460,6 +1749,14 @@
             if (e.key === 'Escape') {
                 if (activeTextInput) {
                     cancelActiveTextInput();
+                } else if (isLoading) {
+                    // AI 请求进行中，取消请求
+                    const cancelled = await ipcRenderer.invoke('editor:cancel-ai');
+                    if (cancelled) {
+                        setLoading(false);
+                        isLoading = false;
+                        showToast('AI 解读已取消', 'info');
+                    }
                 } else if (savePanel.style.display === 'block') {
                     hideSavePanel();
                 } else if (resultModal.style.display === 'block') {

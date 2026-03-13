@@ -8,6 +8,10 @@ const { OpenAI } = require('openai');
 const fs = require('fs');
 const path = require('path');
 
+// 超时配置常量
+const DEFAULT_TIMEOUT_MS = 30000; // 单次 API 调用 30 秒超时
+const OCR_SINGLE_ATTEMPT_TIMEOUT_MS = 25000; // OCR 单次尝试 25 秒超时
+
 class AIClient {
     constructor(systemPrompt = "你是一个乐于助人的 AI 助手。") {
         this.systemPrompt = systemPrompt;
@@ -16,7 +20,30 @@ class AIClient {
         this.isVLM = false;
         this.siliconToken = null;
         this.ocrModelCandidates = ['PaddlePaddle/PaddleOCR-VL-1.5'];
+        this.abortController = null; // 用于取消请求
         this._initClient();
+    }
+
+    /**
+     * 取消当前请求
+     */
+    abort() {
+        if (this.abortController) {
+            this.abortController.abort();
+            this.abortController = null;
+        }
+    }
+
+    /**
+     * 创建新的 AbortController（用于新请求）
+     * @returns {AbortController}
+     */
+    _getOrCreateAbortController(signal) {
+        // 如果外部提供了 signal，直接使用
+        if (signal) return { controller: null, signal };
+        // 否则创建内部 controller
+        this.abortController = new AbortController();
+        return { controller: this.abortController, signal: this.abortController.signal };
     }
 
     /**
@@ -260,20 +287,22 @@ class AIClient {
         return '';
     }
 
-    async _requestDeepSeekOcrMarkdown(imagePath, strictMode = false, ocrModelName = 'PaddlePaddle/PaddleOCR-VL-1.5') {
+    async _requestDeepSeekOcrMarkdown(imagePath, strictMode = false, ocrModelName = 'PaddlePaddle/PaddleOCR-VL-1.5', timeoutMs = OCR_SINGLE_ATTEMPT_TIMEOUT_MS, signal = null) {
         if (!this.siliconToken) {
             throw new Error('未配置 SILICONFLOW_API_KEY，无法调用 DeepSeek-OCR');
         }
 
         const ocrClient = new OpenAI({
             baseURL: 'https://api.siliconflow.cn/v1',
-            apiKey: this.siliconToken
+            apiKey: this.siliconToken,
+            timeout: timeoutMs
         });
 
         const imageData = this._imageToDataUrl(imagePath);
         const dataUrl = imageData.dataUrl;
         const prompt = this._buildDeepSeekOcrMarkdownPrompt(strictMode);
-        const response = await ocrClient.chat.completions.create({
+
+        const requestOptions = {
             model: ocrModelName,
             messages: [
                 {
@@ -289,7 +318,14 @@ class AIClient {
             top_p: 0.7,
             frequency_penalty: 0.6,
             max_tokens: strictMode ? 700 : 900
-        });
+        };
+
+        // 添加 signal 支持（如果提供）
+        if (signal) {
+            requestOptions.signal = signal;
+        }
+
+        const response = await ocrClient.chat.completions.create(requestOptions);
 
         const rawOutput = this._extractAssistantContent(response?.choices?.[0]?.message?.content);
         return {
@@ -308,9 +344,11 @@ class AIClient {
     /**
      * 使用 DeepSeek-OCR 生成整图结构化 Markdown 描述（含 OCR 文本）
      * @param {string} imagePath
+     * @param {AbortSignal} signal - 可选的取消信号
+     * @param {number} maxTotalTimeMs - 总超时时间
      * @returns {Promise<{markdown: string, debug: object}>}
      */
-    async _describeImageWithDeepSeekOCR(imagePath) {
+    async _describeImageWithDeepSeekOCR(imagePath, signal = null, maxTotalTimeMs = null) {
         const ocrDebug = {
             ocrAttempted: true,
             ocrSucceeded: false,
@@ -320,13 +358,32 @@ class AIClient {
             candidateModels: this.ocrModelCandidates
         };
 
+        // 计算总超时时间（如果没有提供，则根据候选模型数量计算）
+        const maxTotalTime = maxTotalTimeMs || (OCR_SINGLE_ATTEMPT_TIMEOUT_MS * this.ocrModelCandidates.length * 2);
+        const startTime = Date.now();
+
         let lastError = null;
         let attempt = 0;
         for (const modelName of this.ocrModelCandidates) {
             for (const strictMode of [false, true]) {
+                // 检查是否已取消
+                if (signal && signal.aborted) {
+                    const abortError = new Error('请求已取消');
+                    abortError.name = 'AbortError';
+                    abortError.ocrDebug = ocrDebug;
+                    throw abortError;
+                }
+
+                // 检查是否总超时
+                if (Date.now() - startTime > maxTotalTime) {
+                    const timeoutError = new Error('OCR 总超时');
+                    timeoutError.ocrDebug = ocrDebug;
+                    throw timeoutError;
+                }
+
                 attempt += 1;
                 try {
-                    const attemptResult = await this._requestDeepSeekOcrMarkdown(imagePath, strictMode, modelName);
+                    const attemptResult = await this._requestDeepSeekOcrMarkdown(imagePath, strictMode, modelName, OCR_SINGLE_ATTEMPT_TIMEOUT_MS, signal);
                     const valid = this._isValidOcrMarkdown(attemptResult.markdown);
                     ocrDebug.attempts.push({
                         attempt,
@@ -347,6 +404,11 @@ class AIClient {
                         console.warn(`⚠️ OCR 模型 ${modelName} 首次输出无效，正在严格模式重试...`);
                     }
                 } catch (error) {
+                    // 如果是取消错误，直接抛出
+                    if (error.name === 'AbortError') {
+                        throw error;
+                    }
+
                     lastError = error;
                     ocrDebug.attempts.push({
                         attempt,
@@ -399,11 +461,20 @@ class AIClient {
      * @param {string} imagePath - 图片路径（可选）
      * @param {number} temperature - 生成温度
      * @param {number} maxTokens - 最大 token 数
+     * @param {number} timeoutMs - 超时时间（毫秒）
+     * @param {AbortSignal} signal - 取消信号
     * @returns {Promise<{finalAnswer: string, ocrStructuredMarkdown: string, usedOcr: boolean, model: string, isVLM: boolean, ocrDebug: object, finalAnswerDebug: object}>}
      */
-    async askWithOcrAudit(text, imagePath = null, temperature = 0.7, maxTokens = 2000) {
+    async askWithOcrAudit(text, imagePath = null, temperature = 0.7, maxTokens = 2000, timeoutMs = DEFAULT_TIMEOUT_MS, signal = null) {
         if (!text && !imagePath) {
             throw new Error('text 和 imagePath 至少需要一个');
+        }
+
+        // 检查是否已取消
+        if (signal && signal.aborted) {
+            const abortError = new Error('请求已取消');
+            abortError.name = 'AbortError';
+            throw abortError;
         }
 
         // 构建消息内容
@@ -437,7 +508,9 @@ class AIClient {
             // 非 VLM 模型：调用 DeepSeek-OCR 生成整图结构化描述，再拼到提示词
             ocrDebug.ocrAttempted = true;
             try {
-                const ocrPayload = await this._describeImageWithDeepSeekOCR(imagePath);
+                // 计算剩余时间用于 OCR
+                const ocrMaxTime = timeoutMs ? Math.min(timeoutMs * 0.6, 45000) : 45000;
+                const ocrPayload = await this._describeImageWithDeepSeekOCR(imagePath, signal, ocrMaxTime);
                 ocrDebug = ocrPayload.debug || ocrDebug;
                 const ocrDescription = ocrPayload.markdown || '';
                 if (ocrDescription) {
@@ -451,6 +524,10 @@ class AIClient {
                     }
                 }
             } catch (e) {
+                // 如果是取消错误，直接抛出
+                if (e.name === 'AbortError') {
+                    throw e;
+                }
                 const fallbackDebug = e && e.ocrDebug ? e.ocrDebug : ocrDebug;
                 ocrDebug = {
                     ...fallbackDebug,
@@ -469,15 +546,23 @@ class AIClient {
             : content;
 
         try {
-            const response = await this.client.chat.completions.create({
+            const requestOptions = {
                 model: this.modelName,
                 messages: [
                     { role: 'system', content: this.systemPrompt },
                     { role: 'user', content: userContent }
                 ],
                 temperature,
-                max_tokens: maxTokens
-            });
+                max_tokens: maxTokens,
+                timeout: timeoutMs
+            };
+
+            // 添加 signal 支持（如果提供）
+            if (signal) {
+                requestOptions.signal = signal;
+            }
+
+            const response = await this.client.chat.completions.create(requestOptions);
 
             const finalRawOutput = response?.choices?.[0]?.message?.content || '';
 
@@ -494,6 +579,10 @@ class AIClient {
                 }
             };
         } catch (e) {
+            // 如果是取消错误，直接抛出
+            if (e.name === 'AbortError') {
+                throw e;
+            }
             throw new Error(`AI 请求失败：${e.message}`);
         }
     }
@@ -503,11 +592,20 @@ class AIClient {
      * @param {string} text - 文本输入
      * @param {string} imagePath - 图片路径（可选）
      * @param {function} onChunk - 收到每个文本块时的回调
+     * @param {number} timeoutMs - 超时时间（毫秒）
+     * @param {AbortSignal} signal - 取消信号
      * @returns {Promise<string>} 完整回复
      */
-    async askStream(text, imagePath = null, onChunk) {
+    async askStream(text, imagePath = null, onChunk, timeoutMs = DEFAULT_TIMEOUT_MS, signal = null) {
         if (!text && !imagePath) {
             throw new Error('text 和 imagePath 至少需要一个');
+        }
+
+        // 检查是否已取消
+        if (signal && signal.aborted) {
+            const abortError = new Error('请求已取消');
+            abortError.name = 'AbortError';
+            throw abortError;
         }
 
         let content = [];
@@ -527,7 +625,9 @@ class AIClient {
             }
         } else if (imagePath && !this.isVLM) {
             try {
-                const ocrPayload = await this._describeImageWithDeepSeekOCR(imagePath);
+                // 计算剩余时间用于 OCR
+                const ocrMaxTime = timeoutMs ? Math.min(timeoutMs * 0.6, 45000) : 45000;
+                const ocrPayload = await this._describeImageWithDeepSeekOCR(imagePath, signal, ocrMaxTime);
                 const ocrDescription = ocrPayload.markdown || '';
                 if (ocrDescription) {
                     const ocrPrompt = `\n\n${ocrDescription}`;
@@ -538,6 +638,10 @@ class AIClient {
                     }
                 }
             } catch (e) {
+                // 如果是取消错误，直接抛出
+                if (e.name === 'AbortError') {
+                    throw e;
+                }
                 console.warn(`⚠️ OCR 回退失败：${e.message}`);
             }
         }
@@ -547,7 +651,7 @@ class AIClient {
             : content;
 
         try {
-            const stream = await this.client.chat.completions.create({
+            const requestOptions = {
                 model: this.modelName,
                 messages: [
                     { role: 'system', content: this.systemPrompt },
@@ -555,11 +659,25 @@ class AIClient {
                 ],
                 temperature: 0.7,
                 max_tokens: 2000,
-                stream: true
-            });
+                stream: true,
+                timeout: timeoutMs
+            };
+
+            // 添加 signal 支持（如果提供）
+            if (signal) {
+                requestOptions.signal = signal;
+            }
+
+            const stream = await this.client.chat.completions.create(requestOptions);
 
             let fullResponse = '';
             for await (const chunk of stream) {
+                // 检查是否已取消
+                if (signal && signal.aborted) {
+                    const abortError = new Error('请求已取消');
+                    abortError.name = 'AbortError';
+                    throw abortError;
+                }
                 const delta = chunk.choices[0]?.delta?.content || '';
                 if (delta) {
                     fullResponse += delta;
@@ -570,6 +688,10 @@ class AIClient {
             }
             return fullResponse;
         } catch (e) {
+            // 如果是取消错误，直接抛出
+            if (e.name === 'AbortError') {
+                throw e;
+            }
             throw new Error(`AI 流式请求失败：${e.message}`);
         }
     }
