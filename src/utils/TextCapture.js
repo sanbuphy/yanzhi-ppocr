@@ -484,52 +484,34 @@ except Exception as e:
      * @returns {Promise<object>}
      */
     async saveToKnowledgeBase(text, description = '') {
-        return new Promise((resolve) => {
-            const pythonCode = `
-import sys
-import json
-sys.path.insert(0, r'${this.toolsDir.replace(/\\/g, '/')}')
-
-try:
-    from choose_to_save import ContentManager, InputType
-    manager = ContentManager()
-    result = manager.save_content(InputType.TEXT, None, description=${description ? JSON.stringify(description) : 'None'}, text_content=${JSON.stringify(text)})
-    print("RESULT:" + json.dumps({"success": True, "path": result} if result else {"success": False, "error": "保存失败"}))
-except Exception as e:
-    print("RESULT:" + json.dumps({"success": False, "error": str(e)}))
-`;
-
-            const proc = spawn('python', ['-c', pythonCode], {
-                cwd: this.toolsDir,
-                env: {
-                    ...process.env,
-                    PYTHONIOENCODING: 'utf-8',
-                    PYTHONUTF8: '1'
-                }
+        try {
+            const { getAgent } = require('../agent/index');
+            const agent = getAgent();
+            
+            // 使用 ClassifySkill 进行分类
+            const classifyResult = await agent.classify({
+                content: text,
+                contentType: 'text'
             });
 
-            let output = '';
-            proc.stdout.on('data', (data) => {
-                output += data.toString('utf-8');
-            });
+            if (!classifyResult.success) {
+                return { success: false, error: classifyResult.error || '智能分类失败' };
+            }
 
-            proc.on('close', (code) => {
-                const match = output.match(/RESULT:(.+)/);
-                if (match) {
-                    try {
-                        resolve(JSON.parse(match[1]));
-                    } catch (e) {
-                        resolve({ success: false, error: '解析失败' });
-                    }
-                } else {
-                    resolve({ success: false, error: '无输出' });
-                }
-            });
+            // 确保目录存在
+            const dirPath = path.dirname(classifyResult.savePath);
+            if (!fs.existsSync(dirPath)) {
+                fs.mkdirSync(dirPath, { recursive: true });
+            }
 
-            proc.on('error', (err) => {
-                resolve({ success: false, error: err.message });
-            });
-        });
+            // 写入文件
+            fs.writeFileSync(classifyResult.savePath, text, 'utf-8');
+
+            return { success: true, path: classifyResult.savePath };
+        } catch (error) {
+            console.error('保存失败:', error);
+            return { success: false, error: error.message };
+        }
     }
 
     /**

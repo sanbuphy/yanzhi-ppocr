@@ -1544,37 +1544,90 @@
 
         let isLoading = false; // 追踪加载状态
 
-        document.getElementById('ai-btn').addEventListener('click', async () => {
-            commitActiveTextInput();
-            isLoading = true;
-            setLoading(true);
-            try {
-                const result = await ipcRenderer.invoke('editor:ai-explain-and-classify', getCanvasDataUrl());
+        // 使用替换节点的方式移除可能存在的旧监听器，防止多次绑定
+        const finishBtn = document.getElementById('finish-btn');
+        const newFinishBtn = finishBtn.cloneNode(true);
+        finishBtn.parentNode.replaceChild(newFinishBtn, finishBtn);
 
-                setLoading(false);
+        newFinishBtn.addEventListener('click', async () => {
+            commitActiveTextInput();
+            try {
+                // 1. 立即复制到剪贴板
+                // 使用 try-catch 包裹 copy 调用，防止其失败阻断后续流程
+                try {
+                    await ipcRenderer.invoke('editor:copy', getCanvasDataUrl());
+                    showToast('已复制到剪贴板，正在分析...', 'info', 1500);
+                } catch (copyError) {
+                    console.error('复制到剪贴板失败:', copyError);
+                    showToast('复制失败，正在分析...', 'error', 1500);
+                }
+
+                // 2. 显示保存面板（加载状态）
+                isLoading = true;
+                
+                // 显示面板但不阻塞
+                showSavePanel('', '', { success: false, error: '正在分析...' });
+                
+                // 设置加载状态UI
+                saveOcrText.innerHTML = '<div style="padding:10px;color:#888">正在识别文字...</div>';
+                saveAiText.innerHTML = '<div style="padding:10px;color:#888">正在生成AI解读...</div>';
+                savePathInput.value = '正在分析内容以选择最佳文件夹...';
+                saveConfirmBtn.disabled = true;
+
+                // 3. 调用 AI 分析
+                const result = await ipcRenderer.invoke('editor:ai-explain-and-classify', getCanvasDataUrl());
+                
                 isLoading = false;
+                saveConfirmBtn.disabled = false;
 
                 if (typeof result === 'string') {
-                    // 超时或其他错误
-                    showResultModal('AI 解读结果', result, { hideCopy: true });
+                    // 错误情况
+                    saveAiText.innerHTML = renderMarkdown(result);
+                    savePathInput.value = '无法自动选择';
                     return;
                 }
 
                 const { ocrText, aiExplanation, classifyResult } = result;
 
-                // 显示新的保存面板
-                showSavePanel(ocrText, aiExplanation, classifyResult);
+                // 4. 更新面板内容
+                saveOcrText.innerHTML = renderMarkdown(ocrText || '无 OCR 内容');
+                saveAiText.innerHTML = renderMarkdown(aiExplanation || '无 AI 解读');
+
+                if (classifyResult && classifyResult.success && classifyResult.savePath) {
+                    savePathInput.value = classifyResult.savePath;
+                    savePanelData.savePath = classifyResult.savePath;
+                    
+                    // 显示分类理由提示
+                    if (classifyResult.reason) {
+                        const reasonEl = document.createElement('div');
+                        reasonEl.className = 'classify-info';
+                        reasonEl.textContent = `💡 ${classifyResult.reason}`;
+                        // 移除旧提示
+                        const oldReason = savePathInput.parentNode.parentNode.querySelector('.classify-info');
+                        if (oldReason) oldReason.remove();
+                        savePathInput.parentNode.parentNode.appendChild(reasonEl);
+                    }
+                } else {
+                    savePathInput.value = classifyResult?.error || '未能获取保存路径';
+                    savePanelData.savePath = '';
+                }
+
+                savePanelData.ocrText = ocrText || '';
+                savePanelData.aiExplanation = aiExplanation || '';
 
             } catch (error) {
-                setLoading(false);
                 isLoading = false;
-                // 如果是取消错误，不显示错误弹窗
-                if (error.message && error.message.includes('取消')) {
-                    showToast('AI 解读已取消', 'info');
-                    return;
-                }
-                showResultModal('AI 解读失败', error.message || String(error), { hideCopy: true });
+                saveConfirmBtn.disabled = false;
+                showToast('分析失败: ' + (error.message || String(error)), 'error');
+                
+                // 即使失败也允许手动保存
+                saveAiText.innerHTML = '分析失败';
+                savePathInput.value = '';
             }
+        });
+
+        document.getElementById('ai-btn').addEventListener('click', () => {
+            document.getElementById('finish-btn').click();
         });
 
         // 浏览按钮 - 选择保存路径
@@ -1596,7 +1649,6 @@
                 showToast('请选择保存路径', 'error');
                 return;
             }
-
             saveConfirmBtn.disabled = true;
             try {
                 const result = await ipcRenderer.invoke('editor:save-to-folder', {
@@ -1610,12 +1662,16 @@
                     hideSavePanel();
                     const folderName = extractFolderName(result.path);
                     showToast(`已保存到「${folderName}」文件夹`, 'success', 1800);
+                    // 保存成功后关闭编辑器
+                    setTimeout(() => {
+                        ipcRenderer.invoke('editor:finish');
+                    }, 800);
                 } else {
                     showToast(result.error || '保存失败', 'error');
+                    saveConfirmBtn.disabled = false;
                 }
             } catch (error) {
                 showToast(error.message || '保存失败', 'error');
-            } finally {
                 saveConfirmBtn.disabled = false;
             }
         });

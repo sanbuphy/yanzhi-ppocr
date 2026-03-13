@@ -576,96 +576,49 @@ function getFileType(filename) {
   return 'file';
 }
 
-// 创建子文件夹（调用 Python choose_to_save）
+// 创建子文件夹（纯 Node.js 实现，无需 Python）
 ipcMain.handle('folder:create', async (event, folderName, basePath) => {
-  return new Promise((resolve) => {
-    const toolsDir = path.join(__dirname, '..', 'tools');
+  try {
+    const fullPath = path.join(basePath, folderName);
+    if (fs.existsSync(fullPath)) {
+      return { success: false, error: '文件夹已存在' };
+    }
     
-    // 转义文件夹名和路径中的特殊字符
-    const safeFolderName = folderName.replace(/'/g, "\\'").replace(/"/g, '\\"');
-    const safeBasePath = basePath.replace(/\\/g, '/').replace(/'/g, "\\'");
+    // 创建主文件夹
+    fs.mkdirSync(fullPath, { recursive: true });
     
-    // 使用 Python 调用 create_folder 方法
-    const pythonCode = `
-import sys
-import json
-sys.path.insert(0, r'${toolsDir.replace(/\\/g, '/')}')
-
-try:
-    from choose_to_save import ContentManager
-    manager = ContentManager()
-    result = manager.create_folder('${safeFolderName}', r'${safeBasePath}')
-    
-    if result:
-        # 获取刚创建的文件夹的描述
-        description = ""
-        for folder in manager.folder_config.get("folders", []):
-            if folder["name"] == '${safeFolderName}':
-                description = folder.get("description", "")
-                break
-        
-        output = {"success": True, "path": result, "description": description}
-        print("RESULT_JSON:" + json.dumps(output, ensure_ascii=False))
-    else:
-        print("RESULT_JSON:" + json.dumps({"success": False, "error": "创建失败"}))
-except Exception as e:
-    print("RESULT_JSON:" + json.dumps({"success": False, "error": str(e)}, ensure_ascii=False))
-`;
-    
-    console.log('[CreateFolder] 开始创建文件夹:', folderName, '在', basePath);
-    
-    const proc = spawn('python', ['-c', pythonCode], {
-      cwd: toolsDir,
-      env: {
-        ...process.env,
-        PYTHONIOENCODING: 'utf-8',
-        PYTHONUTF8: '1',
-      },
-    });
-    
-    let stdout = '';
-    let stderr = '';
-    
-    // 设置超时（30秒，因为需要 AI 生成描述）
-    const timeout = setTimeout(() => {
-      proc.kill();
-      resolve({ success: false, error: '操作超时' });
-    }, 30000);
-    
-    proc.stdout.on('data', (data) => {
-      stdout += data.toString('utf-8');
-      console.log(`[CreateFolder] ${data.toString('utf-8').trim()}`);
-    });
-    
-    proc.stderr.on('data', (data) => {
-      stderr += data.toString('utf-8');
-      console.error(`[CreateFolder Error] ${data.toString('utf-8').trim()}`);
-    });
-    
-    proc.on('close', (code) => {
-      clearTimeout(timeout);
-      
-      // 解析 JSON 结果
-      if (stdout.includes('RESULT_JSON:')) {
-        try {
-          const jsonStr = stdout.split('RESULT_JSON:')[1].split('\n')[0].trim();
-          const result = JSON.parse(jsonStr);
-          resolve(result);
-        } catch (e) {
-          console.error('[CreateFolder] JSON 解析失败:', e);
-          resolve({ success: false, error: '结果解析失败: ' + e.message });
-        }
-      } else {
-        resolve({ success: false, error: stderr || stdout || '未知错误' });
+    // 自动创建标准子目录
+    const subDirs = ['images', '博客', '文章'];
+    for (const subDir of subDirs) {
+      const subDirPath = path.join(fullPath, subDir);
+      if (!fs.existsSync(subDirPath)) {
+        fs.mkdirSync(subDirPath, { recursive: true });
       }
-    });
+    }
     
-    proc.on('error', (err) => {
-      clearTimeout(timeout);
-      console.error('[CreateFolder] 进程错误:', err);
-      resolve({ success: false, error: err.message });
+    console.log('[CreateFolder] 成功创建文件夹及其子目录:', fullPath);
+    return { success: true, path: fullPath, description: '新建子文件夹（已包含 images/博客/文章）' };
+  } catch (error) {
+    console.error('[CreateFolder Error] 创建文件夹失败:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// 显示保存文件对话框
+ipcMain.handle('folder:showSaveDialog', async (event, options) => {
+  try {
+    const defaultPath = options.defaultPath || '';
+    const filters = options.filters || [{ name: 'All Files', extensions: ['*'] }];
+    const title = options.title || '保存文件';
+    const win = BrowserWindow.getAllWindows()[0] || null;
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: title, defaultPath: defaultPath, filters: filters
     });
-  });
+    return { success: true, canceled, filePath };
+  } catch (error) {
+    console.error('[ShowSaveDialog Error]', error);
+    return { success: false, error: error.message };
+  }
 });
 
 // 读取文件内容
@@ -714,6 +667,18 @@ ipcMain.handle('file:delete', async (event, filePath) => {
     return { success: true };
   } catch (err) {
     console.error('[File] 删除文件失败:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 写入文件
+ipcMain.handle('file:write', async (event, filePath, content) => {
+  try {
+    fs.writeFileSync(filePath, content, 'utf8');
+    console.log('[File] 已写入文件:', filePath);
+    return { success: true };
+  } catch (err) {
+    console.error('[File] 写入文件失败:', err);
     return { success: false, error: err.message };
   }
 });

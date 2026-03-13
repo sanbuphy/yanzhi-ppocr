@@ -4,6 +4,9 @@ let fileTreeData = [];
 // Current opened folder path
 let currentFolderPath = null;
 
+// Current selected folder path (for creating subfolders)
+let currentSelectedFolder = null;
+
 // Current selected file
 let currentFile = null;
 
@@ -515,10 +518,11 @@ function convertToTreeData(items, basePath) {
 
 // 创建子文件夹（使用 choose_to_save 的方法）
 async function createSubFolder() {
-  console.log('createSubFolder 被调用, currentFolderPath =', currentFolderPath);
+  const targetPath = currentSelectedFolder || currentFolderPath;
+  console.log('createSubFolder 被调用, targetPath =', targetPath);
   
   // 如果没有打开文件夹，先让用户选择一个
-  if (!currentFolderPath) {
+  if (!targetPath) {
     const confirmOpen = await showConfirm('请先选择一个文件夹作为父目录。<br>点击"确定"选择文件夹。');
     if (!confirmOpen) return;
     
@@ -526,6 +530,7 @@ async function createSubFolder() {
     if (!currentFolderPath) {
       return; // 用户取消了选择
     }
+    // 如果刚打开了文件夹，targetPath 就是 currentFolderPath
   }
   
   // 弹出输入框让用户输入文件夹名称
@@ -537,21 +542,14 @@ async function createSubFolder() {
     return; // 用户取消或输入为空
   }
   
-  // 显示加载提示
-  const loadingDiv = document.createElement('div');
-  loadingDiv.id = 'createFolderLoading';
-  loadingDiv.className = 'dialog-overlay';
-  loadingDiv.innerHTML = '<div class="dialog-box"><div class="dialog-content">🤖 AI 正在生成文件夹描述，请稍候...</div></div>';
-  document.body.appendChild(loadingDiv);
-  
   try {
-    // 调用后端创建文件夹
-    console.log('开始创建文件夹:', folderName, '在', currentFolderPath);
-    const result = await window.electronAPI.folder.create(folderName.trim(), currentFolderPath);
-    console.log('创建结果:', result);
+    // 确定父目录：如果当前选中了文件夹，则在该文件夹下创建；否则在根目录下创建
+    const parentPath = currentSelectedFolder || currentFolderPath;
     
-    // 移除加载提示
-    loadingDiv.remove();
+    // 调用后端创建文件夹
+    console.log('开始创建文件夹:', folderName, '在', parentPath);
+    const result = await window.electronAPI.folder.create(folderName.trim(), parentPath);
+    console.log('创建结果:', result);
     
     if (result.success) {
       console.log('文件夹创建成功:', result.path);
@@ -559,34 +557,21 @@ async function createSubFolder() {
       // 重新激活工作区以更新统计数据
       if (window.electronAPI.workspace?.setActive) {
         console.log('重新激活工作区以更新统计...');
+        // 注意：这里仍然激活根工作区，而不是新创建的子文件夹
         const workspaceResult = await window.electronAPI.workspace.setActive(currentFolderPath);
         console.log('工作区重新激活结果:', workspaceResult);
-
-        if (!workspaceResult?.success) {
-          console.warn('重新激活工作区失败:', workspaceResult?.error || '未知错误');
-        } else {
-          console.log('工作区重新激活成功');
-        }
       }
 
-      // 重新读取文件夹内容以刷新列表
-      const readResult = await window.electronAPI.folder.read(currentFolderPath);
-      if (readResult.success) {
-        fileTreeData = convertToTreeData(readResult.items, currentFolderPath);
-        renderFileTree();
-        // 保存文件夹状态
-        saveFolderState();
-      }
+      // 刷新文件树
+      // 如果是在子文件夹创建，可能需要展开该子文件夹
+      // 这里简单起见，刷新整个树，保留展开状态
+      await refreshFileTree(false);
 
       await showAlert(`文件夹 "${folderName}" 创建成功！<br><br>📝 描述: ${result.description || '无'}`);
     } else {
       await showAlert('创建文件夹失败: ' + (result.error || '未知错误'));
     }
   } catch (error) {
-    // 移除加载提示
-    const loading = document.getElementById('createFolderLoading');
-    if (loading) loading.remove();
-    
     console.error('创建子文件夹失败:', error);
     await showAlert('创建子文件夹失败: ' + error.message);
   }
@@ -1070,14 +1055,15 @@ async function selectFile(file) {
       
       // 对 Markdown 文件进行渲染
       if (file.fileType === 'markdown') {
-        const renderedContent = renderMarkdown(content);
-        div.innerHTML = `<div class="markdown-content">${renderedContent}</div>`;
+        // 使用编辑器模式显示 Markdown，默认预览模式
+        const displayArea = document.getElementById('displayArea');
+        displayArea.innerHTML = '';
+        openNoteEditor(file.path, content);
       } else {
         div.innerHTML = `<pre style="color: #ffffff; white-space: pre-wrap; padding: 20px;">${escapeHtml(content)}</pre>`;
+        displayArea.innerHTML = '';
+        displayArea.appendChild(div);
       }
-      
-      displayArea.innerHTML = '';
-      displayArea.appendChild(div);
     }
   } catch (error) {
     console.error('读取文件失败:', error);
@@ -1891,14 +1877,17 @@ async function displayFile(file, ext) {
       div.className = 'file-preview';
 
       if (fileType === 'markdown') {
-        const renderedContent = renderMarkdown(content);
-        div.innerHTML = `<div class="markdown-content">${renderedContent}</div>`;
+        // 使用编辑器模式显示 Markdown，默认预览模式
+        const displayArea = document.getElementById('displayArea');
+        displayArea.innerHTML = '';
+        // 确保传递 content 字符串
+        const contentStr = typeof content === 'string' ? content : '';
+        openNoteEditor(fileObj.path, contentStr);
       } else {
         div.innerHTML = `<pre style="color: #ffffff; white-space: pre-wrap; padding: 20px;">${escapeHtml(content)}</pre>`;
+        displayArea.innerHTML = '';
+        displayArea.appendChild(div);
       }
-
-      displayArea.innerHTML = '';
-      displayArea.appendChild(div);
     }
   } catch (error) {
     console.error('读取文件失败:', error);
@@ -2257,46 +2246,196 @@ let templates = [
   }
 ];
 
+// ================= 中间面板视图管理 =================
+// 统一视图切换，确保同时只有一个视图可见
+function switchMiddleView(viewName) {
+  const views = {
+    display: document.getElementById('displayArea'),
+    template: document.getElementById('templateView'),
+    editor: document.getElementById('templateEditorView'),
+  };
+  Object.entries(views).forEach(([name, el]) => {
+    if (el) el.style.display = name === viewName ? 'flex' : 'none';
+  });
+}
+
 // 显示模板选择界面
 function showTemplateView() {
-  const displayArea = document.getElementById('displayArea');
-  const templateView = document.getElementById('templateView');
-  
-  if (displayArea && templateView) {
-    displayArea.style.display = 'none';
-    templateView.style.display = 'flex';
-    renderTemplates();
-  }
+  switchMiddleView('template');
+  renderTemplates();
 }
 
 // 隐藏模板选择界面
 function hideTemplateView() {
-  const displayArea = document.getElementById('displayArea');
-  const templateView = document.getElementById('templateView');
-  
-  if (displayArea && templateView) {
-    displayArea.style.display = 'flex';
-    templateView.style.display = 'none';
+  switchMiddleView('display');
+}
+
+// 显示模板编辑界面
+function showTemplateEditor(template = null) {
+  const templateEditorView = document.getElementById('templateEditorView');
+  const editorTitle = document.getElementById('editorTitle');
+  const templateTitleInput = document.getElementById('templateTitleInput');
+  const templateContentInput = document.getElementById('templateContentInput');
+  const editorDate = document.getElementById('editorDate');
+
+  switchMiddleView('editor');
+
+  if (templateEditorView) {
+    templateEditorView.dataset.templateId = template ? template.id : '';
+
+    if (template) {
+      editorTitle.textContent = '编辑自定义模板';
+      templateTitleInput.value = template.name;
+      templateContentInput.value = template.content;
+    } else {
+      editorTitle.textContent = '新建自定义模板';
+      templateTitleInput.value = '';
+      templateContentInput.value = '# 标题\n\n## 正文内容\n\n';
+    }
+
+    const now = new Date();
+    editorDate.textContent = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`;
   }
 }
+
+// 隐藏模板编辑界面
+function hideTemplateEditor() {
+  switchMiddleView('display');
+}
+
+// ================= 自定义文件夹选择器 =================
+function showFolderPicker(basePath, treeData) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'dialog-overlay';
+
+    let selectedPath = basePath; // 默认选择根目录
+
+    // 递归构建文件夹树 HTML
+    function buildFolderTree(items, depth = 0) {
+      let html = '';
+      items.forEach(item => {
+        if (item.type === 'folder') {
+          const indent = depth * 20;
+          // 构建完整路径用于 data-path
+          const fullPath = item.path;
+          
+          html += `<div class="folder-picker-item" data-path="${fullPath}" data-name="${item.name.toLowerCase()}" style="padding-left:${indent + 12}px;">
+            <span class="folder-picker-icon">📁</span> <span class="folder-picker-name">${item.name}</span>
+          </div>`;
+          if (item.children && item.children.length > 0) {
+            html += buildFolderTree(item.children, depth + 1);
+          }
+        }
+      });
+      return html;
+    }
+
+    const folderName = basePath.split(/[\\/]/).pop();
+    const folderTreeHtml = buildFolderTree(treeData);
+
+    overlay.innerHTML = `
+      <div class="dialog-box" style="min-width:450px;max-width:600px;max-height:80vh;display:flex;flex-direction:column;">
+        <div class="dialog-header" style="margin-bottom:15px;border-bottom:1px solid #444;padding-bottom:10px;">
+          <strong style="font-size:16px;">选择保存位置</strong>
+        </div>
+        
+        <div class="dialog-search" style="margin-bottom:10px;">
+          <input type="text" id="fpSearchInput" class="dialog-input" placeholder="搜索文件夹..." style="margin-bottom:0;">
+        </div>
+
+        <div class="folder-picker-tree" id="fpTree" style="flex:1;overflow-y:auto;min-height:200px;max-height:400px;border:1px solid #444;border-radius:8px;background:#1a1a1a;margin-bottom:15px;">
+          <div class="folder-picker-item selected" data-path="${basePath}" data-name="${folderName.toLowerCase()}" style="padding-left:12px;">
+            <span class="folder-picker-icon">📁</span> <span class="folder-picker-name">${folderName}（根目录）</span>
+          </div>
+          ${folderTreeHtml}
+        </div>
+        
+        <div class="dialog-footer" style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+          <div class="selected-path-display" style="font-size:12px;color:#888;max-width:250px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            已选: ${basePath}
+          </div>
+          <div class="dialog-buttons">
+            <button class="dialog-btn" id="fpCancel">取消</button>
+            <button class="dialog-btn dialog-btn-primary" id="fpConfirm">确定</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const treeContainer = overlay.querySelector('#fpTree');
+    const searchInput = overlay.querySelector('#fpSearchInput');
+    const pathDisplay = overlay.querySelector('.selected-path-display');
+    const confirmBtn = overlay.querySelector('#fpConfirm');
+
+    // 搜索功能
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      const items = treeContainer.querySelectorAll('.folder-picker-item');
+      
+      items.forEach(item => {
+        const name = item.dataset.name;
+        if (name.includes(query)) {
+          item.style.display = 'flex';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    });
+
+    // 点击选中文件夹
+    const items = overlay.querySelectorAll('.folder-picker-item');
+    items.forEach(item => {
+      item.addEventListener('click', () => {
+        items.forEach(i => i.classList.remove('selected'));
+        item.classList.add('selected');
+        selectedPath = item.dataset.path;
+        pathDisplay.textContent = `已选: ${selectedPath}`;
+        pathDisplay.title = selectedPath;
+      });
+
+      // 双击直接确认
+      item.addEventListener('dblclick', () => {
+        overlay.remove();
+        resolve(selectedPath);
+      });
+    });
+
+    overlay.querySelector('#fpCancel').addEventListener('click', () => {
+      overlay.remove();
+      resolve(null);
+    });
+
+    confirmBtn.addEventListener('click', () => {
+      overlay.remove();
+      resolve(selectedPath);
+    });
+    
+    // 聚焦搜索框
+    searchInput.focus();
+  });
+}
+
 
 // 渲染模板列表
 function renderTemplates() {
   const templateGrid = document.getElementById('templateGrid');
   if (!templateGrid) return;
-  
+
   // 从localStorage加载模板
   const savedTemplates = localStorage.getItem('templates');
   if (savedTemplates) {
     templates = JSON.parse(savedTemplates);
   }
-  
+
   templateGrid.innerHTML = '';
-  
+
   templates.forEach(template => {
     const card = document.createElement('div');
     card.className = `template-card ${template.color}`;
-    
+
     card.innerHTML = `
       <div class="template-card-title">${template.name}</div>
       <div class="template-card-desc">${template.description}</div>
@@ -2305,49 +2444,50 @@ function renderTemplates() {
         <button class="template-card-btn edit" data-id="${template.id}">编辑</button>
       </div>
     `;
-    
-    // 使用模板
+
     card.querySelector('.use').addEventListener('click', (e) => {
       e.stopPropagation();
       useTemplate(template);
     });
-    
-    // 编辑模板
+
     card.querySelector('.edit').addEventListener('click', (e) => {
       e.stopPropagation();
       editTemplate(template);
     });
-    
+
     templateGrid.appendChild(card);
   });
-  
-  // 新建模板按钮
+
   const newTemplateBtn = document.getElementById('newTemplateBtn');
   if (newTemplateBtn) {
     newTemplateBtn.onclick = () => createCustomTemplate();
   }
 }
 
-// 使用模板
+// 使用模板（带文件夹选择器和笔记编辑器）
 async function useTemplate(template) {
   if (!currentFolderPath) {
     await showAlert('请先打开一个文件夹');
     return;
   }
-  
+
+  // 1. 让用户选择保存路径
+  const savePath = await showFolderPicker(currentFolderPath, fileTreeData);
+  if (!savePath) return;
+
+  // 2. 让用户输入文件名
   const fileName = await showPrompt('请输入笔记文件名：<br><br>例如：深度学习基础笔记');
-  if (!fileName || fileName.trim() === '') {
-    return;
-  }
-  
-  const filePath = `${currentFolderPath}/${fileName.trim()}.md`;
-  
+  if (!fileName || fileName.trim() === '') return;
+
+  const filePath = savePath.replace(/\\/g, '/') + '/' + fileName.trim() + '.md';
+
   try {
     const result = await window.electronAPI.file.write(filePath, template.content);
     if (result.success) {
-      await showAlert('笔记创建成功！');
+      showMainToast('笔记创建成功！');
       await refreshFileTree(false);
-      hideTemplateView();
+      // 3. 自动进入编辑模式
+      openNoteEditor(filePath, template.content);
     } else {
       await showAlert('创建失败：' + (result.error || '未知错误'));
     }
@@ -2362,51 +2502,87 @@ async function editTemplate(template) {
   showTemplateEditor(template);
 }
 
-// 显示模板编辑界面
-function showTemplateEditor(template = null) {
-  const displayArea = document.getElementById('displayArea');
-  const templateView = document.getElementById('templateView');
-  const templateEditorView = document.getElementById('templateEditorView');
-  const editorTitle = document.getElementById('editorTitle');
-  const templateTitleInput = document.getElementById('templateTitleInput');
-  const templateContentInput = document.getElementById('templateContentInput');
-  const editorDate = document.getElementById('editorDate');
-  
-  if (displayArea && templateEditorView) {
-    displayArea.style.display = 'none';
-    if (templateView) templateView.style.display = 'none';
-    templateEditorView.style.display = 'flex';
-    
-    // 设置当前编辑的模板（用于编辑模式）
-    templateEditorView.dataset.templateId = template ? template.id : '';
-    
-    if (template) {
-      // 编辑模式
-      editorTitle.textContent = '编辑自定义模板';
-      templateTitleInput.value = template.name;
-      templateContentInput.value = template.content;
-    } else {
-      // 新建模式
-      editorTitle.textContent = '新建自定义模板';
-      templateTitleInput.value = '';
-      templateContentInput.value = '# 标题\n\n## 正文内容\n\n';
-    }
-    
-    // 更新日期
-    const now = new Date();
-    editorDate.textContent = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`;
-  }
-}
+// ================= Markdown 笔记编辑器 =================
+let _noteEditorFilePath = null;
 
-// 隐藏模板编辑界面
-function hideTemplateEditor() {
+function openNoteEditor(filePath, content) {
+  _noteEditorFilePath = filePath;
   const displayArea = document.getElementById('displayArea');
-  const templateEditorView = document.getElementById('templateEditorView');
-  
-  if (displayArea && templateEditorView) {
-    templateEditorView.style.display = 'none';
-    displayArea.style.display = 'flex';
-  }
+  if (!displayArea) return;
+
+  switchMiddleView('display');
+
+  const fileName = filePath.split(/[\\/]/).pop();
+
+  displayArea.innerHTML = `
+    <div class="note-editor-container">
+      <div class="note-editor-toolbar">
+        <span class="note-editor-filename">📝 ${fileName}</span>
+        <div class="note-editor-actions">
+          <button class="note-editor-btn" id="noteEditBtn">✏️ 编辑</button>
+          <button class="note-editor-btn active" id="notePreviewBtn">👁 预览</button>
+          <button class="note-editor-btn note-save-btn" id="noteSaveBtn">💾 保存</button>
+        </div>
+      </div>
+      <div class="note-editor-body">
+        <textarea class="note-editor-textarea" id="noteTextarea" style="display:none;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+        <div class="note-editor-preview markdown-content" id="notePreview" style="display:block;"></div>
+      </div>
+    </div>
+  `;
+
+  const textarea = document.getElementById('noteTextarea');
+  const preview = document.getElementById('notePreview');
+  const editBtn = document.getElementById('noteEditBtn');
+  const previewBtn = document.getElementById('notePreviewBtn');
+  const saveBtn = document.getElementById('noteSaveBtn');
+
+  // 初始化预览内容
+  preview.innerHTML = renderMarkdown(content);
+
+  // 为预览内容中的链接添加点击处理
+  const addLinkHandlers = () => {
+    preview.querySelectorAll('.external-link').forEach(link => {
+      link.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const url = link.dataset.url;
+        if (url) {
+          await window.electronAPI.shell.openExternal(url);
+        }
+      });
+    });
+  };
+  addLinkHandlers();
+
+  editBtn.addEventListener('click', () => {
+    textarea.style.display = 'block';
+    preview.style.display = 'none';
+    editBtn.classList.add('active');
+    previewBtn.classList.remove('active');
+    textarea.focus();
+  });
+
+  previewBtn.addEventListener('click', () => {
+    preview.innerHTML = renderMarkdown(textarea.value);
+    addLinkHandlers();
+    textarea.style.display = 'none';
+    preview.style.display = 'block';
+    previewBtn.classList.add('active');
+    editBtn.classList.remove('active');
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    try {
+      const result = await window.electronAPI.file.write(_noteEditorFilePath, textarea.value);
+      if (result.success) {
+        showMainToast('保存成功！');
+      } else {
+        showMainToast('保存失败：' + (result.error || '未知错误'), 'error');
+      }
+    } catch (err) {
+      showMainToast('保存失败：' + err.message, 'error');
+    }
+  });
 }
 
 // 从编辑界面保存模板

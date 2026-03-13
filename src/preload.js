@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     readPdf: (filePath) => ipcRenderer.invoke('file:readPdf', filePath),
     delete: (filePath) => ipcRenderer.invoke('file:delete', filePath),
     copy: (filePath) => ipcRenderer.invoke('file:copy', filePath),
+    write: (filePath, content) => ipcRenderer.invoke('file:write', filePath, content),
   },
   
   // AI 问答
