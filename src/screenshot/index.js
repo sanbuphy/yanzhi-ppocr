@@ -194,35 +194,16 @@ class ScreenshotManager {
             const tempPath = path.join(tempDir, `screenshot_${Date.now()}.png`);
             fs.writeFileSync(tempPath, screenshot);
 
-            // 使用 ClassifySkill 进行分类
-            const { getAgent } = require('../agent/index');
-            const agent = getAgent();
-            
-            const classifyResult = await agent.classify({
-                content: tempPath,
-                contentType: 'image'
-            });
+            // 调用 Python 的 choose_to_save.py 进行分类保存
+            const result = await this.callPythonClassifier(tempPath, explanation);
 
             // 清理临时文件
             fs.unlinkSync(tempPath);
 
-            if (!classifyResult.success) {
-                return { success: false, error: classifyResult.error || '智能分类失败' };
-            }
-
-            // 确保目录存在
-            const dirPath = path.dirname(classifyResult.savePath);
-            if (!fs.existsSync(dirPath)) {
-                fs.mkdirSync(dirPath, { recursive: true });
-            }
-
-            // 写入文件
-            fs.writeFileSync(classifyResult.savePath, screenshot);
-
-            return { success: true, path: classifyResult.savePath };
+            return result;
         } catch (error) {
             console.error('保存到知识库失败:', error);
-            return { success: false, error: error.message };
+            throw error;
         }
     }
 

@@ -1,0 +1,12 @@
+{
+  "schedules": [
+    {
+      "keyword": "transformer",
+      "time": "09:00",
+      "repeat": "daily",
+      "enabled": true,
+      "id": "1773475810524",
+      "createdAt": "2026-03-14T08:10:10.524Z"
+    }
+  ]
+}

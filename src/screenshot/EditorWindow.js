@@ -221,16 +221,10 @@ class EditorWindow {
             });
         });
 
-        // 仅复制到剪贴板
-        ipcMain.handle('editor:copy', async (event, base64) => {
+        // 完成编辑（复制到剪贴板）
+        ipcMain.handle(finishChannel, async (event, base64) => {
             if (!isFromEditorWindow(event)) return false;
             await this.copyToClipboard(base64);
-            return true;
-        });
-
-        // 完成编辑（仅关闭，前端负责复制和保存流程）
-        ipcMain.handle(finishChannel, async (event) => {
-            if (!isFromEditorWindow(event)) return false;
             this.close();
             return true;
         });
@@ -271,7 +265,6 @@ class EditorWindow {
     cleanupIpcHandlers() {
         this.log('cleanupIpcHandlers');
         ipcMain.removeHandler('editor:save-image');
-        ipcMain.removeHandler('editor:copy');
         ipcMain.removeHandler('editor:ai-explain');
         ipcMain.removeHandler('editor:ai-explain-and-classify');
         ipcMain.removeHandler('editor:save-to-folder');
