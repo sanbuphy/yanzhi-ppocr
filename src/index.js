@@ -413,7 +413,8 @@ ipcMain.handle('workspace:getStats', async () => {
       return {
         ...folder,
         fileCount: summaryFolder?.fileCount || 0,
-        totalSize: summaryFolder?.totalSize || 0
+        totalSize: summaryFolder?.totalSize || 0,
+        detailFile: summaryFolder?.detailFile
       };
     });
 

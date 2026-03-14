@@ -551,7 +551,8 @@ async function fetchCategories() {
       name: folder.name,
       count: folder.fileCount || 0,
       color: null, // 可以后续根据需要添加颜色逻辑
-      description: folder.description || ''
+      description: folder.description || '',
+      detailFile: folder.detailFile
     }));
   } catch (error) {
     console.error('获取分类数据失败:', error);
@@ -770,12 +771,16 @@ function updateRecentItems(recentFiles) {
     let icon = '../../img/file.png';
     const ext = file.name.split('.').pop()?.toLowerCase();
     
+    let type = 'file';
     if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
       icon = '../../img/picture.png';
+      type = 'image';
     } else if (ext === 'pdf') {
       icon = '../../img/file.png';
+      type = 'pdf';
     } else if (['md', 'txt'].includes(ext)) {
       icon = '../../img/chat-bot.png';
+      type = 'note';
     }
     
     // 格式化添加时间
@@ -783,7 +788,7 @@ function updateRecentItems(recentFiles) {
     const timeText = addedTime.toLocaleDateString();
     
     return `
-      <div class="recent-item">
+      <div class="recent-item" data-filepath="${file.path.replace(/\\/g, '\\\\')}" data-filename="${file.name}" data-type="${type}" style="cursor: pointer;">
         <img src="${icon}" alt="${ext}" class="recent-item-icon" />
         <div class="recent-item-content">
           <div class="recent-item-title">${file.name}</div>
@@ -792,6 +797,27 @@ function updateRecentItems(recentFiles) {
       </div>
     `;
   }).join('');
+
+  // 绑定点击事件
+  document.querySelectorAll('.recent-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const filePath = item.getAttribute('data-filepath');
+      const fileName = item.getAttribute('data-filename');
+      const fileType = item.getAttribute('data-type');
+      
+      if (filePath) {
+        // 保存跳转参数到 sessionStorage
+        sessionStorage.setItem('pendingFile', JSON.stringify({
+          action: 'view',
+          filePath: filePath,
+          fileName: fileName,
+          fileType: fileType
+        }));
+        // 跳转到主页面 (文献储存情况)
+        window.location.href = '../main/main.html';
+      }
+    });
+  });
 }
 
 // 渲染分类摘要
@@ -803,7 +829,7 @@ async function renderCategorySummary(category) {
     document.getElementById('knowledgeItemsTitle').textContent = `知识条目分类管理: ${category.name}`;
     
     // 获取当前分类的详细文件列表
-    const detailResult = await window.electronAPI.workspace.getCategoryDetail(category.name);
+    const detailResult = await window.electronAPI.workspace.getCategoryDetail(category.detailFile || category.name);
     if (detailResult.success && detailResult.files) {
       const files = detailResult.files;
       
@@ -1035,7 +1061,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // 延迟渲染最近添加，确保DOM完全加载
   setTimeout(() => {
     updateOverviewStats(); // 更新概览统计信息
-    renderRecentItems();
     renderCategories();
   }, 100);
 });
