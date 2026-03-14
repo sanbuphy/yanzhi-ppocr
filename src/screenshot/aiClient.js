@@ -82,7 +82,7 @@ class AIClient {
 
     /**
      * 初始化 AI 客户端
-     * 优先级：GitHub Models (GPT-4o) > SiliconFlow (Qwen)
+     * 优先级：GitHub Models (GPT-4o) > SiliconFlow Qwen3.5 (多模态) > OCR + Qwen2.5
      */
     _initClient() {
         this._loadEnvFile();
@@ -112,14 +112,14 @@ class AIClient {
             this.isVLM = true;
             console.log(`✅ 使用 GitHub Models: ${this.modelName}`);
         } else if (siliconToken) {
-            // 使用 SiliconFlow (Qwen2.5-7B-Instruct 免费模型)
+            // 使用 SiliconFlow Qwen3.5 (多模态模型，支持视觉)
             this.client = new OpenAI({
                 baseURL: 'https://api.siliconflow.cn/v1',
                 apiKey: siliconToken
             });
-            this.modelName = 'Qwen/Qwen2.5-7B-Instruct';
-            this.isVLM = false;
-            console.log(`✅ 使用 SiliconFlow: ${this.modelName}`);
+            this.modelName = 'Qwen/Qwen3.5-9B';
+            this.isVLM = true;
+            console.log(`✅ 使用 SiliconFlow Qwen3.5 (多模态): ${this.modelName}`);
         } else {
             throw new Error('请设置环境变量：GITHUB_TOKEN 或 SILICONFLOW_API_KEY');
         }
@@ -545,23 +545,21 @@ class AIClient {
             ? content[0].text
             : content;
 
+        const requestOptions = {
+            model: this.modelName,
+            messages: [
+                { role: 'system', content: this.systemPrompt },
+                { role: 'user', content: userContent }
+            ],
+            temperature,
+            max_tokens: maxTokens
+        };
+
+        if (signal) {
+            requestOptions.signal = signal;
+        }
+
         try {
-            const requestOptions = {
-                model: this.modelName,
-                messages: [
-                    { role: 'system', content: this.systemPrompt },
-                    { role: 'user', content: userContent }
-                ],
-                temperature,
-                max_tokens: maxTokens,
-                timeout: timeoutMs
-            };
-
-            // 添加 signal 支持（如果提供）
-            if (signal) {
-                requestOptions.signal = signal;
-            }
-
             const response = await this.client.chat.completions.create(requestOptions);
 
             const finalRawOutput = response?.choices?.[0]?.message?.content || '';
@@ -583,8 +581,100 @@ class AIClient {
             if (e.name === 'AbortError') {
                 throw e;
             }
+
+            // 如果是 SiliconFlow Qwen3.5 且有图片，尝试回退到 OCR + Qwen2.5
+            if (this.modelName === 'Qwen/Qwen3.5-9B' && imagePath && this.siliconToken) {
+                console.warn(`⚠️ Qwen3.5 请求失败，尝试回退到 OCR + Qwen2.5: ${e.message}`);
+                return await this._fallbackToOcrAndQwen25(text, imagePath, temperature, maxTokens, timeoutMs, signal, ocrDebug);
+            }
+
             throw new Error(`AI 请求失败：${e.message}`);
         }
+    }
+
+    /**
+     * 回退到 OCR + Qwen2.5 模型
+     * @private
+     */
+    async _fallbackToOcrAndQwen25(text, imagePath, temperature, maxTokens, timeoutMs, signal, ocrDebug) {
+        // 创建 Qwen2.5 客户端
+        const fallbackClient = new OpenAI({
+            baseURL: 'https://api.siliconflow.cn/v1',
+            apiKey: this.siliconToken,
+            timeout: timeoutMs
+        });
+
+        const fallbackModel = 'Qwen/Qwen2.5-7B-Instruct';
+        let content = [];
+        let ocrStructuredMarkdown = '';
+        let usedOcr = false;
+
+        if (text) {
+            content.push({ type: 'text', text });
+        }
+
+        // 使用 OCR 处理图片
+        ocrDebug.ocrAttempted = true;
+        try {
+            const ocrMaxTime = timeoutMs ? Math.min(timeoutMs * 0.6, 45000) : 45000;
+            const ocrPayload = await this._describeImageWithDeepSeekOCR(imagePath, signal, ocrMaxTime);
+            ocrDebug = { ...ocrDebug, ...ocrPayload.debug };
+            const ocrDescription = ocrPayload.markdown || '';
+            if (ocrDescription) {
+                ocrStructuredMarkdown = ocrDescription;
+                usedOcr = true;
+                const ocrPrompt = `\n\n${ocrDescription}`;
+                if (content.length > 0 && content[0].type === 'text') {
+                    content[0].text = (content[0].text || '') + ocrPrompt;
+                } else {
+                    content.push({ type: 'text', text: ocrPrompt });
+                }
+            }
+        } catch (ocrError) {
+            if (ocrError.name === 'AbortError') {
+                throw ocrError;
+            }
+            ocrDebug.ocrSucceeded = false;
+            ocrDebug.ocrFailureReason = ocrError.message;
+            console.warn(`⚠️ OCR 回退也失败：${ocrError.message}`);
+            throw new Error(`Qwen3.5 和 OCR 回退都失败：${ocrError.message}`);
+        }
+
+        const userContent = content.length === 1 && content[0].type === 'text'
+            ? content[0].text
+            : content;
+
+        const requestOptions = {
+            model: fallbackModel,
+            messages: [
+                { role: 'system', content: this.systemPrompt },
+                { role: 'user', content: userContent }
+            ],
+            temperature,
+            max_tokens: maxTokens
+        };
+
+        if (signal) {
+            requestOptions.signal = signal;
+        }
+
+        const response = await fallbackClient.chat.completions.create(requestOptions);
+        const finalRawOutput = response?.choices?.[0]?.message?.content || '';
+
+        console.log(`✅ 回退到 OCR + ${fallbackModel} 成功`);
+
+        return {
+            finalAnswer: finalRawOutput,
+            ocrStructuredMarkdown,
+            usedOcr,
+            model: fallbackModel,
+            isVLM: false,
+            ocrDebug,
+            finalAnswerDebug: {
+                provider: 'siliconflow-fallback',
+                ...this._buildResponseDebug(response, finalRawOutput)
+            }
+        };
     }
 
     /**
@@ -692,8 +782,95 @@ class AIClient {
             if (e.name === 'AbortError') {
                 throw e;
             }
+
+            // 如果是 SiliconFlow Qwen3.5 且有图片，尝试回退到 OCR + Qwen2.5
+            if (this.modelName === 'Qwen/Qwen3.5-9B' && imagePath && this.siliconToken) {
+                console.warn(`⚠️ Qwen3.5 流式请求失败，尝试回退到 OCR + Qwen2.5: ${e.message}`);
+                return await this._fallbackStreamToOcrAndQwen25(text, imagePath, onChunk, timeoutMs, signal);
+            }
+
             throw new Error(`AI 流式请求失败：${e.message}`);
         }
+    }
+
+    /**
+     * 流式请求回退到 OCR + Qwen2.5 模型
+     * @private
+     */
+    async _fallbackStreamToOcrAndQwen25(text, imagePath, onChunk, timeoutMs, signal) {
+        const fallbackClient = new OpenAI({
+            baseURL: 'https://api.siliconflow.cn/v1',
+            apiKey: this.siliconToken,
+            timeout: timeoutMs
+        });
+
+        const fallbackModel = 'Qwen/Qwen2.5-7B-Instruct';
+        let content = [];
+
+        if (text) {
+            content.push({ type: 'text', text });
+        }
+
+        // 使用 OCR 处理图片
+        try {
+            const ocrMaxTime = timeoutMs ? Math.min(timeoutMs * 0.6, 45000) : 45000;
+            const ocrPayload = await this._describeImageWithDeepSeekOCR(imagePath, signal, ocrMaxTime);
+            const ocrDescription = ocrPayload.markdown || '';
+            if (ocrDescription) {
+                const ocrPrompt = `\n\n${ocrDescription}`;
+                if (content.length > 0 && content[0].type === 'text') {
+                    content[0].text = (content[0].text || '') + ocrPrompt;
+                } else {
+                    content.push({ type: 'text', text: ocrPrompt });
+                }
+            }
+        } catch (ocrError) {
+            if (ocrError.name === 'AbortError') {
+                throw ocrError;
+            }
+            console.warn(`⚠️ OCR 回退也失败：${ocrError.message}`);
+            throw new Error(`Qwen3.5 流式请求和 OCR 回退都失败：${ocrError.message}`);
+        }
+
+        const userContent = content.length === 1 && content[0].type === 'text'
+            ? content[0].text
+            : content;
+
+        const requestOptions = {
+            model: fallbackModel,
+            messages: [
+                { role: 'system', content: this.systemPrompt },
+                { role: 'user', content: userContent }
+            ],
+            temperature: 0.7,
+            max_tokens: 2000,
+            stream: true
+        };
+
+        if (signal) {
+            requestOptions.signal = signal;
+        }
+
+        const stream = await fallbackClient.chat.completions.create(requestOptions);
+
+        console.log(`✅ 回退到 OCR + ${fallbackModel} 流式请求成功`);
+
+        let fullResponse = '';
+        for await (const chunk of stream) {
+            if (signal && signal.aborted) {
+                const abortError = new Error('请求已取消');
+                abortError.name = 'AbortError';
+                throw abortError;
+            }
+            const delta = chunk.choices[0]?.delta?.content || '';
+            if (delta) {
+                fullResponse += delta;
+                if (onChunk) {
+                    onChunk(delta);
+                }
+            }
+        }
+        return fullResponse;
     }
 }
 

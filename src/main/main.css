@@ -2108,6 +2108,40 @@ img.file-preview {
   background: linear-gradient(135deg, #f44336, #d32f2f);
 }
 
+/* ================= 插入笔记按钮样式 ================= */
+.insert-note-btn {
+  display: inline-block;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
+  border: none;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+}
+
+.insert-note-btn:hover {
+  background: linear-gradient(135deg, #45a049, #3d8b40);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+}
+
+.insert-note-btn:disabled {
+  cursor: wait;
+}
+
+.insert-note-btn.saved {
+  background: linear-gradient(135deg, #2196F3, #1976D2);
+  cursor: default;
+}
+
+.insert-note-btn.error {
+  background: linear-gradient(135deg, #f44336, #d32f2f);
+}
+
 /* ================= 保存成功通知动画 ================= */
 @keyframes slideIn {
   from {

@@ -689,6 +689,8 @@ async function displayFileFromPath(filePath, fileName, fileType) {
         if (fileType === 'note' || fileName.endsWith('.md')) {
           const renderedContent = renderMarkdown(result.content);
           div.innerHTML = `<div class="markdown-content">${renderedContent}</div>`;
+          // 绑定本地文件链接点击事件
+          bindLocalFileLinks(div);
         } else {
           div.innerHTML = `<pre style="color: #ffffff; white-space: pre-wrap; padding: 20px;">${escapeHtml(result.content)}</pre>`;
         }
@@ -765,6 +767,9 @@ async function sendAIAnalysisRequest(filePath, fileName, fileType, prompt) {
           }
         });
       });
+
+      // 为本地文件链接添加点击处理，在主界面打开
+      bindLocalFileLinks(contentDiv);
 
       aiMsgDiv.appendChild(contentDiv);
     } else {
@@ -1210,6 +1215,14 @@ function renderMarkdown(markdown) {
     console.warn('[renderMarkdown] ⚠️ 存在按钮但正则未匹配！请检查按钮 HTML 格式');
   }
 
+  // 保护插入笔记按钮 HTML 标签
+  const insertNoteButtons = [];
+  html = html.replace(/<button class="insert-note-btn"[^>]*>[\s\S]*?<\/button>/g, (match) => {
+    const placeholder = `@@INSNOTE${insertNoteButtons.length}@@`;
+    insertNoteButtons.push(match);
+    return placeholder;
+  });
+
   // 转义HTML特殊字符
   html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   
@@ -1273,7 +1286,8 @@ function renderMarkdown(markdown) {
     if (url.startsWith('http://') || url.startsWith('https://')) {
       return `<a href="#" class="external-link" data-url="${url}">${text}</a>`;
     }
-    return `<a href="${url}">${text}</a>`;
+    // 本地文件路径（如 E:/知识库/论文.pdf）
+    return `<a href="#" class="local-file-link" data-path="${url}">${text}</a>`;
   });
   
   // 水平线 (--- 或 ***)
@@ -1356,6 +1370,9 @@ function renderMarkdown(markdown) {
     } else if (trimmed.match(/^@@DLBTN\d+@@$/)) {
       // 下载按钮占位符，不包裹在 <p> 中
       result.push(trimmed);
+    } else if (trimmed.match(/^@@INSNOTE\d+@@$/)) {
+      // 插入笔记按钮占位符，不包裹在 <p> 中
+      result.push(trimmed);
     } else {
       // 普通段落
       result.push(`<p>${trimmed}</p>`);
@@ -1379,6 +1396,11 @@ function renderMarkdown(markdown) {
     html = html.replace(`@@DLBTN${i}@@`, btn);
   });
 
+  // 恢复插入笔记按钮
+  insertNoteButtons.forEach((btn, i) => {
+    html = html.replace(`@@INSNOTE${i}@@`, btn);
+  });
+
   return html;
 }
 
@@ -1397,6 +1419,44 @@ function renderMarkdownWithLinks(markdown, container) {
       const url = link.dataset.url;
       if (url) {
         await window.electronAPI.shell.openExternal(url);
+      }
+    });
+  });
+
+  // 为本地文件链接添加点击处理，在主界面打开
+  bindLocalFileLinks(container);
+}
+
+/**
+ * 为本地文件链接绑定点击事件
+ * @param {HTMLElement} container - 包含链接的容器元素
+ */
+function bindLocalFileLinks(container) {
+  container.querySelectorAll('.local-file-link').forEach(link => {
+    link.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const filePath = link.dataset.path;
+      if (filePath) {
+        // 根据扩展名确定文件类型
+        const ext = filePath.split('.').pop()?.toLowerCase();
+        let fileType = 'text';
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) {
+          fileType = 'image';
+        } else if (ext === 'pdf') {
+          fileType = 'pdf';
+        } else if (ext === 'md') {
+          fileType = 'markdown';
+        }
+
+        // 创建文件对象
+        const file = {
+          name: filePath.split(/[/\\]/).pop(),
+          path: filePath,
+          fileType: fileType
+        };
+
+        // 调用 selectFile 在主界面打开
+        await selectFile(file);
       }
     });
   });
@@ -2232,6 +2292,80 @@ async function downloadAndSavePdf(paper, element) {
   }
 }
 
+// 将 AI 回复插入笔记到知识库
+async function insertNoteToKnowledgeBase(content, buttonElement, attachedFiles) {
+  const originalText = buttonElement.textContent;
+  try {
+    buttonElement.textContent = '分类中...';
+    buttonElement.disabled = true;
+
+    // 生成标题（时间戳格式）
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const title = `AI笔记 - ${dateStr} ${timeStr}`;
+
+    // 构建完整内容
+    let fullContent = `# ${title}\n\n`;
+
+    // 添加文件链接（如果有）
+    if (attachedFiles && attachedFiles.length > 0) {
+      fullContent += `## 相关文件\n\n`;
+      attachedFiles.forEach(filePath => {
+        // 提取文件名
+        const fileName = filePath.split(/[/\\]/).pop();
+        // 使用 markdown 链接格式
+        fullContent += `- [${fileName}](${filePath})\n`;
+      });
+      fullContent += '\n---\n\n';
+    }
+
+    // 添加 AI 回复内容
+    fullContent += content;
+
+    // 1. 调用智能分类
+    const classifyResult = await window.electronAPI.agent.process('分类', {
+      content: fullContent,
+      contentType: 'text'
+    });
+
+    if (!classifyResult.success || !classifyResult.result?.savePath) {
+      throw new Error(classifyResult.error || '分类失败');
+    }
+
+    const savePath = classifyResult.result.savePath;
+    buttonElement.textContent = '保存中...';
+
+    // 2. 保存到文件
+    const saveResult = await window.electronAPI.file.write(savePath, fullContent);
+
+    if (saveResult.success) {
+      buttonElement.textContent = '已插入 ✓';
+      buttonElement.classList.add('saved');
+
+      // 提取目录路径（兼容 Windows 和 Unix 路径）
+      const lastSepIndex = Math.max(savePath.lastIndexOf('/'), savePath.lastIndexOf('\\'));
+      const dirPath = lastSepIndex > 0 ? savePath.substring(0, lastSepIndex) : savePath;
+      const folderName = classifyResult.result.folderName || dirPath.split(/[/\\]/).pop();
+
+      showMainToast(`已保存到「${folderName}」文件夹`, 'success');
+    } else {
+      throw new Error(saveResult.error || '保存失败');
+    }
+  } catch (error) {
+    console.error('插入笔记失败:', error);
+    buttonElement.textContent = '失败 ✕';
+    buttonElement.classList.add('error');
+    showMainToast('插入失败: ' + error.message, 'error');
+
+    setTimeout(() => {
+      buttonElement.textContent = originalText;
+      buttonElement.classList.remove('error');
+      buttonElement.disabled = false;
+    }, 3000);
+  }
+}
+
 // 显示保存成功通知
 function showSaveNotification(options) {
   const { title, path, dirPath } = options;
@@ -2336,12 +2470,35 @@ function addUserMessage(text) {
 
 // Add AI message
 function addAIMessage(text) {
+  // 检查是否需要添加"插入笔记"按钮（非推荐文献、非错误消息）
+  const shouldAddInsertBtn = !text.includes('paper-download-btn') &&
+                              !text.startsWith('❌') &&
+                              !text.startsWith('📚');
+
+  if (shouldAddInsertBtn) {
+    // 在文本末尾添加插入笔记按钮
+    text += '\n\n<button class="insert-note-btn">📝 插入笔记</button>';
+  }
+
+  // 收集附件文件路径
+  const attachedFilePaths = [];
+  if (currentFile && currentFile.path) {
+    attachedFilePaths.push(currentFile.path);
+  }
+  attachedFiles.forEach(file => {
+    if (file.path && !attachedFilePaths.includes(file.path)) {
+      attachedFilePaths.push(file.path);
+    }
+  });
+
   const message = {
       type: 'ai',
       text: text,
-      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+      // 保存附件文件路径
+      attachedFiles: attachedFilePaths.length > 0 ? attachedFilePaths : null
   };
-  
+
   chatHistory.push(message);
   renderMessage(message);
   saveChatHistory();
@@ -2381,6 +2538,9 @@ function renderMessage(message) {
     });
   });
 
+  // 为本地文件链接添加点击处理，在主界面打开
+  bindLocalFileLinks(content);
+
   // 为 PDF 下载链接添加点击处理，直接下载并保存
   content.querySelectorAll('.pdf-download-link').forEach(link => {
     link.addEventListener('click', async (e) => {
@@ -2408,7 +2568,18 @@ function renderMessage(message) {
       }
     });
   });
-  
+
+  // 为插入笔记按钮添加点击处理
+  content.querySelectorAll('.insert-note-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      // 提取原始消息文本（移除按钮部分）
+      const originalText = message.text.replace(/\n\n<button class="insert-note-btn"[^>]*>[\s\S]*?<\/button>$/, '');
+      // 传递附件信息
+      await insertNoteToKnowledgeBase(originalText, btn, message.attachedFiles);
+    });
+  });
+
   const time = document.createElement('div');
   time.className = 'message-time';
   time.textContent = message.time;
@@ -2783,6 +2954,7 @@ function openNoteEditor(filePath, content) {
         }
       });
     });
+    bindLocalFileLinks(preview);
   };
   addLinkHandlers();
 
