@@ -586,10 +586,9 @@ async function renderCategories() {
               <div class="category-count">${category.count}个知识条目</div>
               <div class="category-title">${category.name}</div>
             </div>
-            <button class="category-menu-btn" title="更多选项">⋯</button>
+            
           </div>
           <div class="category-actions">
-            <button class="category-btn" data-action="edit" data-id="${category.id}">编辑</button>
             <button class="category-btn primary" data-action="view" data-id="${category.id}">查看</button>
           </div>
         </div>

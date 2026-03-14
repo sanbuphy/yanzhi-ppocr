@@ -419,11 +419,16 @@ function createArticleCard(article) {
   const source = document.createElement('span');
   source.className = `article-source ${article.sourceType}`;
   source.textContent = article.source;
+  source.style.cursor = 'pointer';
   source.addEventListener('click', (e) => {
     e.stopPropagation();
     // 打开论文链接
-    if (article.url) {
-      require('electron').shell.openExternal(article.url);
+    let url = article.url;
+    if (!url && article.arxivId) {
+      url = `https://arxiv.org/abs/${article.arxivId}`;
+    }
+    if (url) {
+      window.electronAPI?.shell?.openExternal(url);
     }
   });
   
