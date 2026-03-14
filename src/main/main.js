@@ -617,6 +617,10 @@ async function handlePendingFile() {
     
     // 设置为当前文件并显示
     currentFile = fileObj;
+    
+    // 将文件自动添加到 AI 对话框的附件中
+    addAttachment(fileObj);
+    
     await displayFileFromPath(displayFilePath, fileName, fileType);
     return;
   }
@@ -1156,12 +1160,9 @@ function getFileType(ext) {
 
 // 添加附件
 function addAttachment(file) {
-  // 检查是否已存在（通过路径或名称）
-  if (attachedFiles.some(f => (f.path && f.path === file.path) || f.name === file.name)) {
-    console.log('附件已存在:', file.name);
-    return false;
-  }
-
+  // 按照需求，每次只保留最新的一个附件，清空之前的
+  attachedFiles = [];
+  
   attachedFiles.push(file);
   renderAttachmentList();
   console.log('添加附件:', file.name, '当前附件数:', attachedFiles.length);
@@ -1545,7 +1546,9 @@ function setupEventListeners() {
           const viewportWidth = window.innerWidth;
           
           // 计算二级菜单的位置，紧贴主菜单（无间隙）
+          // rect.right 是主菜单项的右边缘，直接使用这个值作为二级菜单的 left
           let left = rect.right;
+          // rect.top 是主菜单项的上边缘，直接使用这个值作为二级菜单的 top
           let top = rect.top;
           
           // 如果右侧空间不够，显示在左侧
@@ -1553,8 +1556,12 @@ function setupEventListeners() {
             left = rect.left - 180; // 180px宽度，无间距
           }
           
+          // 强制设置为 fixed 定位，相对于视口
+          submenu.style.position = 'fixed';
           submenu.style.left = left + 'px';
           submenu.style.top = top + 'px';
+          submenu.style.marginLeft = '0'; // 确保没有额外的 margin
+          submenu.style.marginTop = '0'; // 确保没有额外的 margin
         };
         
         // 鼠标进入主菜单项时更新位置
@@ -1789,41 +1796,68 @@ function setupEventListeners() {
   });
   
   // Template button
-  document.getElementById('templateBtn').addEventListener('click', () => {
-    alert('笔记模板功能开发中...');
-  });
+  const templateBtn = document.getElementById('templateBtn');
+  if (templateBtn) {
+    templateBtn.addEventListener('click', () => {
+      alert('笔记模板功能开发中...');
+    });
+  }
 
   // Navigation icons - 页面跳转
   // 用户头像 - 跳转到首页
   const navUserIcon = document.getElementById('navUser');
   if (navUserIcon) {
-    // 加载用户头像
+    // 加载用户头像 (保持不变)
     const avatarImg = navUserIcon.querySelector('img');
     const savedAvatar = localStorage.getItem('profilePicture');
     if (savedAvatar && avatarImg) {
       avatarImg.src = savedAvatar;
     }
     // 点击跳转到首页
-    navUserIcon.addEventListener('click', () => {
+    navUserIcon.addEventListener('click', (e) => {
+      e.stopPropagation();
+      console.log('跳转到首页');
+      // 使用 window.location.href 跳转
       window.location.href = '../index.html';
     });
+  } else {
+    console.error('找不到 navUser 元素');
   }
   
-  // 主界面（AI智能解释）- 当前页面，不需要跳转
-  document.getElementById('navMain')?.addEventListener('click', () => {
-    // 当前页面，不需要跳转
-    console.log('已在主界面');
-  });
+  // 主界面（AI智能解释）
+  const navMain = document.getElementById('navMain');
+  if (navMain) {
+    navMain.addEventListener('click', (e) => {
+      e.stopPropagation();
+      console.log('点击主界面 Tab');
+    });
+  } else {
+    console.error('找不到 navMain 元素');
+  }
   
   // 文献推荐页面
-  document.getElementById('navRecommend')?.addEventListener('click', () => {
-    window.location.href = '../recommend/recommend.html';
-  });
+  const navRecommend = document.getElementById('navRecommend');
+  if (navRecommend) {
+    navRecommend.addEventListener('click', (e) => {
+      e.stopPropagation();
+      console.log('跳转到文献推荐');
+      window.location.href = '../recommend/recommend.html';
+    });
+  } else {
+    console.error('找不到 navRecommend 元素');
+  }
   
   // 知识管理页面
-  document.getElementById('navManage')?.addEventListener('click', () => {
-    window.location.href = '../manage/manage.html';
-  });
+  const navManage = document.getElementById('navManage');
+  if (navManage) {
+    navManage.addEventListener('click', (e) => {
+      e.stopPropagation();
+      console.log('跳转到知识管理');
+      window.location.href = '../manage/manage.html';
+    });
+  } else {
+    console.error('找不到 navManage 元素');
+  }
 }
 
 // Handle file upload
@@ -2395,77 +2429,44 @@ async function insertNoteToKnowledgeBase(content, buttonElement, attachedFiles) 
 function showSaveNotification(options) {
   const { title, path, dirPath } = options;
 
-  // 创建通知容器（如果不存在）
-  let container = document.getElementById('saveNotificationContainer');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'saveNotificationContainer';
-    container.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 10000;
-    `;
-    document.body.appendChild(container);
-  }
+  const container = document.getElementById('notificationContainer');
+  if (!container) return;
 
-  // 创建通知元素
   const notification = document.createElement('div');
-  notification.style.cssText = `
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    padding: 16px;
-    margin-bottom: 10px;
-    max-width: 400px;
-    animation: slideIn 0.3s ease;
-    border-left: 4px solid #4CAF50;
-  `;
+  notification.className = 'in-app-notification';
   notification.innerHTML = `
-    <div style="display: flex; align-items: flex-start; gap: 12px;">
-      <div style="font-size: 24px;">✅</div>
-      <div style="flex: 1;">
-        <div style="font-weight: 600; color: #333; margin-bottom: 4px;">论文保存成功</div>
-        <div style="font-size: 12px; color: #666; margin-bottom: 8px; word-break: break-all;">${title.substring(0, 50)}${title.length > 50 ? '...' : ''}</div>
-        <div style="font-size: 11px; color: #888; word-break: break-all;">${path}</div>
-        <button class="open-folder-btn" style="
-          margin-top: 10px;
-          padding: 6px 12px;
-          background: #4CAF50;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 12px;
-        ">打开文件夹</button>
+    <div class="notification-icon">✅</div>
+    <div class="notification-content">
+      <div class="notification-title">论文保存成功</div>
+      <div class="notification-body" style="margin-bottom: 8px;">
+        ${title.substring(0, 50)}${title.length > 50 ? '...' : ''}<br>
+        <span style="font-size: 11px; opacity: 0.7;">已保存到: ${path}</span>
       </div>
-      <button class="close-notification" style="
-        background: none;
-        border: none;
-        font-size: 18px;
-        cursor: pointer;
-        color: #999;
-      ">×</button>
     </div>
+    <button class="notification-close">&times;</button>
   `;
 
   container.appendChild(notification);
 
-  // 点击"打开文件夹"按钮
-  notification.querySelector('.open-folder-btn').addEventListener('click', () => {
-    window.electronAPI?.shell?.openPath(dirPath);
-    notification.remove();
+  // 点击关闭
+  notification.querySelector('.notification-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    notification.classList.add('hiding');
+    setTimeout(() => notification.remove(), 300);
   });
 
-  // 点击关闭按钮
-  notification.querySelector('.close-notification').addEventListener('click', () => {
-    notification.remove();
+  // 点击通知打开文件夹
+  notification.style.cursor = 'pointer';
+  notification.addEventListener('click', () => {
+    window.electronAPI?.shell?.openPath(dirPath);
+    notification.classList.add('hiding');
+    setTimeout(() => notification.remove(), 300);
   });
 
   // 6秒后自动消失
   setTimeout(() => {
     if (notification.parentNode) {
-      notification.style.animation = 'slideOut 0.3s ease';
+      notification.classList.add('hiding');
       setTimeout(() => notification.remove(), 300);
     }
   }, 6000);
@@ -2626,18 +2627,15 @@ function renderMessage(message) {
 
 // Save chat history
 function saveChatHistory() {
-  localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+  // 按照需求，不再持久化保存对话记录
+  // localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
 }
 
 // Load chat history
 function loadChatHistory() {
-  const saved = localStorage.getItem('chatHistory');
-  if (saved) {
-    chatHistory = JSON.parse(saved);
-    chatHistory.forEach(message => {
-      renderMessage(message);
-    });
-  }
+  // 按照需求，每次进入都是空白的，清空之前的记录
+  localStorage.removeItem('chatHistory'); 
+  chatHistory = [];
 }
 
 // ================= 模板管理功能 =================

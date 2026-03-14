@@ -248,10 +248,6 @@ body::after {
   box-shadow: 0 0 20px rgba(180, 244, 101, 0.4);
 }
 
-.nav-icon.active img {
-  filter: brightness(0);
-}
-
 .nav-icon img {
   width: 24px;
   height: 24px;

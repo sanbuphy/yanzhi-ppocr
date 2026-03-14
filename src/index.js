@@ -4,6 +4,10 @@ const fs = require('fs');
 const os = require('os');
 const metadataManager = require('./utils/MetadataManager');
 
+// 禁用 GPU 和沙箱以避免在受限环境中崩溃
+app.commandLine.appendSwitch('no-sandbox');
+app.disableHardwareAcceleration();
+
 // 引入原生 AI 服务模块
 const { askAI, readPdf, searchArxiv, downloadArxivPdf } = require('./utils/AIProvider');
 
@@ -42,7 +46,8 @@ const WORKSPACE_SCAN_INTERVAL_MS = 120000;
 
 function resolveMainLogFile() {
   try {
-    const logDir = path.join(app.getPath('userData'), 'logs');
+    // 优先使用项目目录下的 logs 目录，避免权限问题
+    const logDir = path.join(__dirname, '..', 'logs');
     return {
       dir: logDir,
       file: path.join(logDir, 'main-process.log')
@@ -580,6 +585,17 @@ function getFileType(filename) {
 ipcMain.handle('folder:create', async (event, folderName, basePath) => {
   try {
     const fullPath = path.join(basePath, folderName);
+    
+    // 检查父目录是否存在，如果不存在则尝试创建（递归）
+    if (!fs.existsSync(basePath)) {
+        try {
+            fs.mkdirSync(basePath, { recursive: true });
+        } catch (e) {
+            console.error(`无法创建父目录 ${basePath}:`, e);
+            // 尝试继续，可能会失败
+        }
+    }
+
     if (fs.existsSync(fullPath)) {
       return { success: false, error: '文件夹已存在' };
     }
@@ -674,6 +690,16 @@ ipcMain.handle('file:delete', async (event, filePath) => {
 // 写入文件
 ipcMain.handle('file:write', async (event, filePath, content) => {
   try {
+    // 确保父目录存在
+    const dirPath = path.dirname(filePath);
+    if (!fs.existsSync(dirPath)) {
+      try {
+        fs.mkdirSync(dirPath, { recursive: true });
+      } catch (e) {
+        console.error(`[File] 无法创建父目录 ${dirPath}:`, e);
+      }
+    }
+
     fs.writeFileSync(filePath, content, 'utf8');
     console.log('[File] 已写入文件:', filePath);
     return { success: true };

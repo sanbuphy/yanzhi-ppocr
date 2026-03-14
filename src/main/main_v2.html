@@ -3,26 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>主界面 - AI科研助手 研知</title>
-    <link rel="stylesheet" href="main.css" />
+    <title>主界面 - AI科研助手 研知 (Refined Style)</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="main_v2.css" />
   </head>
-  <body>
-    <div class="app-container">
+  <body class="bg-[#0d130f] text-white relative overflow-hidden h-screen font-sans selection:bg-[#b4f465] selection:text-black">
+    
+    <!-- 环境光晕 -->
+    <div class="absolute -top-40 -left-40 w-96 h-96 bg-green-500/20 rounded-full blur-[120px] pointer-events-none z-0"></div>
+    <div class="absolute -bottom-40 -right-40 w-[30rem] h-[30rem] bg-green-500/10 rounded-full blur-[150px] pointer-events-none z-0"></div>
+
+    <div class="app-container relative z-10 flex h-full p-6 gap-6">
       <!-- Left Panel: Document Storage -->
       <aside class="left-panel">
         <button class="collapse-btn collapse-left-btn" id="leftCollapseBtn" title="折叠/展开左侧栏">
           <span class="collapse-arrow">◀</span>
         </button>
         <div class="panel-header">
-          <h2>文件储存情况</h2>
+          <h2>文献储存情况</h2>
         </div>
         
         <!-- Search Bar -->
         <div class="search-container">
+          <img src="../../img/update.png" alt="Search" class="search-icon" />
           <input type="text" class="search-input" id="searchInput" placeholder="Search" />
-          <svg class="search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
         </div>
 
         <!-- Action Buttons -->
@@ -60,14 +65,14 @@
               </div>
             </div>
           </div>
-          <!-- <button class="action-btn refresh-btn" id="refreshBtn" title="刷新文件列表">
+          <button class="action-btn refresh-btn" id="refreshBtn" title="刷新文件列表">
             <img src="../../img/update.png" alt="Refresh" class="btn-icon" id="refreshIcon" />
-          </button> -->
+          </button>
         </div>
         
         <!-- 文件夹状态指示 -->
-        <div class="folder-status" id="folderStatus">
-          <span class="status-dot" id="statusDot"></span>
+        <div class="folder-status" id="folderStatus" style="font-size: 12px; color: #666; margin-bottom: 8px; display: flex; align-items: center;">
+          <span class="status-dot" id="statusDot" style="width: 8px; height: 8px; border-radius: 50%; background: #666; margin-right: 6px;"></span>
           <span class="status-text" id="statusText">未打开文件夹</span>
         </div>
 
@@ -109,45 +114,34 @@
         <div class="template-view" id="templateView" style="display: none;">
           <div class="template-header">
             <h2>笔记模板管理</h2>
-            <p>创建和管理你的模板库</p>
+            <p style="color: #999; font-size: 13px;">创建和管理你的模板库</p>
           </div>
           <div class="template-grid" id="templateGrid">
             <!-- Templates will be dynamically generated -->
           </div>
-          <button class="new-template-btn" id="newTemplateBtn">新建笔记模板</button>
+          <button class="new-template-btn" id="newTemplateBtn" style="margin-top: 20px; padding: 10px; background: #b4f465; border: none; border-radius: 4px; cursor: pointer; color: black;">新建笔记模板</button>
         </div>
         
         <!-- Template Editor View -->
         <div class="template-editor-view" id="templateEditorView" style="display: none;">
-          <div class="editor-header">
+          <div class="editor-header" style="display: flex; justify-content: space-between; align-items: center;">
             <div class="editor-title-section">
               <h2 id="editorTitle">新建自定义模板</h2>
-              <div class="editor-meta">
-                <span id="editorDate">12/23/2026</span>
-                <span id="editorSize">2.3 MB</span>
-              </div>
-            </div>
-            <div class="editor-menu">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="1"></circle>
-                <circle cx="12" cy="5" r="1"></circle>
-                <circle cx="12" cy="19" r="1"></circle>
-              </svg>
             </div>
           </div>
-          <div class="editor-content">
+          <div class="editor-content" style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
             <div class="editor-field">
-              <label>标题</label>
-              <input type="text" id="templateTitleInput" class="editor-input" placeholder="请输入模板标题" />
+              <label style="display: block; margin-bottom: 8px; color: #999;">标题</label>
+              <input type="text" id="templateTitleInput" class="editor-input" placeholder="请输入模板标题" style="width: 100%; padding: 8px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: white;" />
             </div>
-            <div class="editor-field">
-              <label>正文内容</label>
-              <textarea id="templateContentInput" class="editor-textarea" placeholder="请输入模板内容（Markdown格式）"></textarea>
+            <div class="editor-field" style="flex: 1; display: flex; flex-direction: column;">
+              <label style="display: block; margin-bottom: 8px; color: #999;">正文内容</label>
+              <textarea id="templateContentInput" class="editor-textarea" placeholder="请输入模板内容（Markdown格式）" style="flex: 1; width: 100%; padding: 8px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: white; resize: none;"></textarea>
             </div>
           </div>
-          <div class="editor-actions">
-            <button class="editor-btn cancel-btn" id="editorCancelBtn">取消</button>
-            <button class="editor-btn save-btn" id="editorSaveBtn">保存</button>
+          <div class="editor-actions" style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+            <button class="editor-btn cancel-btn" id="editorCancelBtn" style="padding: 8px 16px; background: transparent; border: 1px solid rgba(255,255,255,0.2); color: white; cursor: pointer;">取消</button>
+            <button class="editor-btn save-btn" id="editorSaveBtn" style="padding: 8px 16px; background: #b4f465; border: none; color: black; cursor: pointer;">保存</button>
           </div>
         </div>
       </main>
@@ -182,6 +176,10 @@
               </svg>
             </button>
           </div>
+          <button class="template-btn" id="templateBtn">
+            <img src="../../img/robot.png" alt="Template" class="template-icon" />
+            <span>笔记模板</span>
+          </button>
         </div>
       </aside>
     </div>
@@ -189,9 +187,6 @@
     <!-- Hidden file input for upload -->
     <input type="file" id="fileInput" multiple style="display: none;" />
     <input type="file" id="folderInput" webkitdirectory multiple style="display: none;" />
-
-    <!-- Application Notification Container -->
-    <div class="notification-container" id="notificationContainer"></div>
 
     <script src="main.js"></script>
   </body>

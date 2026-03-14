@@ -1,9 +1,11 @@
 {
   "version": 1,
-  "updatedAt": "2026-03-14T14:37:33.054Z",
+  "updatedAt": "2026-03-14T16:41:15.899Z",
   "pathToWorkspaceId": {
     "c:/users/32665/desktop/test_yanzhi": "test_yanzhi__d545a755",
     "d:/论文阅读": "workspace__7cf6eaa0",
-    "c:/users/frunk/desktop/文献": "workspace__f1f8b811"
+    "c:/users/frunk/desktop/文献": "workspace__f1f8b811",
+    "/Users/nnnnm/Desktop/yanzhi-test": "yanzhi-test__aaa15a94",
+    "/Users/nnnnm/Desktop/learn": "learn__29d6da3d"
   }
 }
