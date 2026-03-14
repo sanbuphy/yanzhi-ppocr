@@ -1,6 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog, Notification, globalShortcut, shell } = require('electron');
 const path = require('node:path');
-const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const metadataManager = require('./utils/MetadataManager');
@@ -842,146 +841,51 @@ ipcMain.handle('arxiv:download', async (event, pdfUrl, title) => {
   });
 });
 
-// 将 PDF 保存到合适的文件夹（调用 choose_to_save）
+// 将 PDF 保存到合适的文件夹（使用 Agent ClassifySkill）
 ipcMain.handle('arxiv:saveToFolder', async (event, pdfPath, description) => {
-  return new Promise(async (resolve) => {
-    const toolsDir = path.join(__dirname, '..', 'tools');
-    const safePdfPath = pdfPath.replace(/\\/g, '/');
-    
-    const workspacePath = workspaceScanner && workspaceScanner.currentWorkspace ? workspaceScanner.currentWorkspace.workspacePath : '';
-    const safeWorkspacePath = workspacePath.replace(/\\/g, '/');
-    
-    // AI 智能分类逻辑
-    let finalSubFolder = '文章';
-    try {
-        if (workspaceScanner && workspaceScanner.structureFile && fs.existsSync(workspaceScanner.structureFile)) {
-            const structure = JSON.parse(fs.readFileSync(workspaceScanner.structureFile, 'utf-8'));
-            const folders = structure.folders
-                .filter(f => f.name !== '文章') // 排除掉顶层多余的“文章”文件夹
-                .map(f => ({ name: f.name, desc: f.description }));
-            
-            if (folders.length > 0) {
-                const meta = JSON.parse(description);
-                const aiClient = require('./screenshot/aiClient').getAIClient('你是一个科研文献分类助手。');
-                const prompt = `
-请根据以下论文元数据，从可选目录列表中选择一个最合适的目录。
-可选目录列表：
-${folders.map((f, i) => `${i + 1}. ${f.name} (${f.desc})`).join('\n')}
-
-论文信息：
-标题：${meta.title}
-摘要：${meta.abstract.substring(0, 500)}
-
-只需返回目录名称，不要任何其他文字。如果没有合适的，返回“其他”。
-`;
-                const matchedCategory = await aiClient.ask(prompt, null, 0.3, 50);
-                const cleanedCategory = matchedCategory.trim().replace(/[".]/g, '');
-                
-                // 检查是否在列表中
-                const finalCategory = folders.find(f => f.name === cleanedCategory) ? cleanedCategory : '其他';
-                finalSubFolder = path.join(finalCategory, '文章');
-                console.log(`[SavePDF] AI 分类结果: ${finalCategory} -> 存储路径: ${finalSubFolder}`);
-            }
-        }
-    } catch (e) {
-        console.error('[SavePDF] AI 分类失败:', e.message);
-        finalSubFolder = '文章'; // 降级处理
+  try {
+    if (!workspaceScanner?.currentWorkspace) {
+      return { success: false, error: '未激活工作区' };
     }
 
-    const safeFinalSubFolder = finalSubFolder.replace(/\\/g, '/');
-    const metaObj = JSON.parse(description);
-    const sanitizedTitle = metaObj.title.replace(/[\\/:*?"<>|]/g, '_').substring(0, 100);
-    const safeDescription = description.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, ' ');
+    // 解析元数据
+    const meta = JSON.parse(description);
+    const sanitizedTitle = meta.title.replace(/[\\/:*?”<>|]/g, '_').substring(0, 100);
+    const fileName = sanitizedTitle + '.pdf';
 
-    const pythonCode = `
-import sys
-import json
-sys.path.insert(0, r'${toolsDir.replace(/\\/g, '/')}')
+    // 使用 Agent 的 ClassifySkill 进行分类
+    const classifyResult = await getAgent().classify({
+      content: pdfPath,
+      contentType: 'pdf',
+      fileName: fileName
+    });
 
-try:
-    from choose_to_save import ContentManager, InputType
-    manager = ContentManager()
-    
-    # 串联：使用当前工作区作为保存的基础目录
-    result_path = manager.save_content(
-        InputType.PDF,
-        r'${safePdfPath}',
-        description="""${safeDescription}""",
-        sub_folder=r'${safeFinalSubFolder}',
-        base_path=r'${safeWorkspacePath}',
-        filename=r'${sanitizedTitle.replace(/'/g, "\\'")}'
-    )
-    
-    if result_path:
-        print('SAVE_RESULT:' + json.dumps({"success": True, "path": result_path}, ensure_ascii=False))
-    else:
-        print('SAVE_RESULT:' + json.dumps({"success": False, "error": "保存失败"}))
-except Exception as e:
-    print('SAVE_RESULT:' + json.dumps({"success": False, "error": str(e)}, ensure_ascii=False))
-`;
-    
-    console.log('[SavePDF] 保存到合适文件夹:', pdfPath);
-    
-    const proc = spawn('python', ['-c', pythonCode], {
-      cwd: toolsDir,
-      env: {
-        ...process.env,
-        PYTHONIOENCODING: 'utf-8',
-        PYTHONUTF8: '1',
-      },
-    });
-    
-    let stdout = '';
-    let stderr = '';
-    
-    // 设置超时（30秒）
-    const timeout = setTimeout(() => {
-      proc.kill();
-      resolve({ success: false, error: '操作超时' });
-    }, 30000);
-    
-    proc.stdout.on('data', (data) => {
-      stdout += data.toString('utf-8');
-      console.log(`[SavePDF] ${data.toString('utf-8').trim()}`);
-    });
-    
-    proc.stderr.on('data', (data) => {
-      stderr += data.toString('utf-8');
-    });
-    
-    proc.on('close', (code) => {
-      clearTimeout(timeout);
-      
-      if (stdout.includes('SAVE_RESULT:')) {
-        try {
-          const jsonStr = stdout.split('SAVE_RESULT:')[1].trim();
-          const result = JSON.parse(jsonStr);
-          
-          if (result.success && result.path) {
-              // 文件物理保存成功后，同步保存元数据 Sidecar
-              try {
-                  const meta = JSON.parse(description); // description 在前端已经组装成了 JSON 字符串
-                  metadataManager.saveMetadata(result.path, meta);
-              } catch (e) {
-                  // 如果不是 JSON，尝试作为普通文本保存（兜底）
-                  metadataManager.saveMetadata(result.path, { rawDescription: description });
-              }
-          }
-          
-          resolve(result);
-        } catch (e) {
-          resolve({ success: false, error: '结果解析失败' });
-        }
-      } else {
-        resolve({ success: false, error: stderr || '保存失败' });
-      }
-    });
-    
-    proc.on('error', (err) => {
-      clearTimeout(timeout);
-      resolve({ success: false, error: err.message });
-    });
-  });
+    if (!classifyResult.success) {
+      console.error('[SavePDF] 分类失败:', classifyResult.error);
+      return { success: false, error: classifyResult.error || '分类失败' };
+    }
+
+    console.log(`[SavePDF] AI 分类结果: ${classifyResult.folderName} -> ${classifyResult.savePath}`);
+
+    // 确保目录存在
+    const dirPath = path.dirname(classifyResult.savePath);
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+
+    // 复制文件到目标路径
+    fs.copyFileSync(pdfPath, classifyResult.savePath);
+
+    // 保存元数据 Sidecar
+    metadataManager.saveMetadata(classifyResult.savePath, meta);
+
+    console.log('[SavePDF] 论文已保存到:', classifyResult.savePath);
+    return { success: true, path: classifyResult.savePath };
+
+  } catch (err) {
+    console.error('[SavePDF] 保存失败:', err);
+    return { success: false, error: err.message };
+  }
 });
 
 // ================= 定时推荐功能 =================
@@ -1196,6 +1100,17 @@ ipcMain.handle('shell:openExternal', async (event, url) => {
     return { success: true };
   } catch (err) {
     console.error('[Shell] 打开链接失败:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 在文件管理器中打开路径
+ipcMain.handle('shell:openPath', async (event, filePath) => {
+  try {
+    await shell.openPath(filePath);
+    return { success: true };
+  } catch (err) {
+    console.error('[Shell] 打开路径失败:', err);
     return { success: false, error: err.message };
   }
 });

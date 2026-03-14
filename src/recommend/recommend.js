@@ -564,8 +564,24 @@ async function downloadAndSavePaper(article, button) {
         <span>已保存</span>
       `;
       button.classList.add('success');
-      
+
       console.log('论文已保存到:', saveResult.path);
+
+      // 提取目录路径（兼容 Windows 和 Unix 路径）
+      const lastSepIndex = Math.max(saveResult.path.lastIndexOf('/'), saveResult.path.lastIndexOf('\\'));
+      const dirPath = lastSepIndex > 0 ? saveResult.path.substring(0, lastSepIndex) : saveResult.path;
+
+      // 显示保存成功通知
+      showNotification({
+        icon: '✅',
+        title: '论文保存成功',
+        body: `已保存到: ${saveResult.path}`,
+        duration: 6000,
+        onClick: () => {
+          // 打开文件所在目录
+          window.electronAPI?.shell?.openPath(dirPath);
+        }
+      });
     } else {
       throw new Error(saveResult.error || '保存失败');
     }
@@ -800,7 +816,7 @@ function getRepeatLabel(repeat) {
 function showInAppNotification(keyword, papers) {
   const container = document.getElementById('notificationContainer');
   if (!container) return;
-  
+
   const notification = document.createElement('div');
   notification.className = 'in-app-notification';
   notification.innerHTML = `
@@ -811,15 +827,15 @@ function showInAppNotification(keyword, papers) {
     </div>
     <button class="notification-close">&times;</button>
   `;
-  
+
   container.appendChild(notification);
-  
+
   // 点击关闭
   notification.querySelector('.notification-close').addEventListener('click', () => {
     notification.classList.add('hiding');
     setTimeout(() => notification.remove(), 300);
   });
-  
+
   // 5秒后自动消失
   setTimeout(() => {
     if (notification.parentNode) {
@@ -827,5 +843,50 @@ function showInAppNotification(keyword, papers) {
       setTimeout(() => notification.remove(), 300);
     }
   }, 5000);
+}
+
+// 显示通用通知
+function showNotification(options) {
+  const { icon, title, body, duration = 5000, onClick } = options;
+  const container = document.getElementById('notificationContainer');
+  if (!container) return;
+
+  const notification = document.createElement('div');
+  notification.className = 'in-app-notification';
+  notification.innerHTML = `
+    <div class="notification-icon">${icon || '📚'}</div>
+    <div class="notification-content">
+      <div class="notification-title">${title || '通知'}</div>
+      <div class="notification-body">${body || ''}</div>
+    </div>
+    <button class="notification-close">&times;</button>
+  `;
+
+  container.appendChild(notification);
+
+  // 点击关闭
+  notification.querySelector('.notification-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    notification.classList.add('hiding');
+    setTimeout(() => notification.remove(), 300);
+  });
+
+  // 点击通知
+  if (onClick) {
+    notification.style.cursor = 'pointer';
+    notification.addEventListener('click', () => {
+      onClick();
+      notification.classList.add('hiding');
+      setTimeout(() => notification.remove(), 300);
+    });
+  }
+
+  // 自动消失
+  setTimeout(() => {
+    if (notification.parentNode) {
+      notification.classList.add('hiding');
+      setTimeout(() => notification.remove(), 300);
+    }
+  }, duration);
 }
 

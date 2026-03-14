@@ -88,5 +88,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Shell 操作（在默认浏览器打开链接）
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+    openPath: (filePath) => ipcRenderer.invoke('shell:openPath', filePath),
   }
 });

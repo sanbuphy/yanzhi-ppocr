@@ -1177,9 +1177,9 @@ function renderAttachmentList() {
 // Markdown 渲染函数
 function renderMarkdown(markdown) {
   if (!markdown) return '';
-  
+
   let html = markdown;
-  
+
   // 先处理代码块，避免代码块内的内容被其他规则处理
   const codeBlocks = [];
   html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
@@ -1187,7 +1187,7 @@ function renderMarkdown(markdown) {
     codeBlocks.push({ id, code: code.trim() });
     return id;
   });
-  
+
   // 处理行内代码
   const inlineCodes = [];
   html = html.replace(/`([^`\n]+)`/g, (match, code) => {
@@ -1195,7 +1195,21 @@ function renderMarkdown(markdown) {
     inlineCodes.push({ id, code });
     return id;
   });
-  
+
+  // 先保护下载按钮 HTML 标签（在转义之前）
+  const downloadButtons = [];
+  const originalHtml = html;
+  // 使用更宽松的正则：允许 data-paper 属性值包含任何字符（包括换行符），非贪婪匹配
+  html = html.replace(/<button class="paper-download-btn" data-paper='[\s\S]*?'>[\s\S]*?<\/button>/g, (match) => {
+    console.log('[renderMarkdown] ✅ 匹配到下载按钮');
+    const id = `DOWNLOAD_BUTTON_${downloadButtons.length}`;
+    downloadButtons.push(match);
+    return id;
+  });
+  if (downloadButtons.length === 0 && originalHtml.includes('paper-download-btn')) {
+    console.warn('[renderMarkdown] ⚠️ 存在按钮但正则未匹配！请检查按钮 HTML 格式');
+  }
+
   // 转义HTML特殊字符
   html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   
@@ -1231,7 +1245,8 @@ function renderMarkdown(markdown) {
     return '<em>' + text + '</em>';
   });
   html = html.replace(/_([^_\n]+?)_/g, (match, text) => {
-    if (match.includes('CODE_BLOCK') || match.includes('INLINE_CODE')) {
+    // 如果包含代码标记或下载按钮占位符，跳过
+    if (match.includes('CODE_BLOCK') || match.includes('INLINE_CODE') || match.includes('DOWNLOAD_BUTTON')) {
       return match;
     }
     return '<em>' + text + '</em>';
@@ -1241,6 +1256,18 @@ function renderMarkdown(markdown) {
   html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
   
   // 链接 [text](url) - 为外部链接添加特殊类，使用 shell.openExternal 在默认浏览器打开
+  // 特殊处理 PDF 下载链接：[PDF](url "{{DOWNLOAD_PDF:{data}}}")
+  html = html.replace(/\[([^\]]+)\]\(([^)]+?)\s+"?\{\{DOWNLOAD_PDF:([^}]+)\}\}"?\)/g, (match, text, url, paperData) => {
+    try {
+      const decodedData = paperData.replace(/&quot;/g, '"');
+      return `<a href="#" class="pdf-download-link" data-paper='${decodedData}'>${text}</a>`;
+    } catch (e) {
+      // 解析失败，回退到普通外部链接
+      return `<a href="#" class="external-link" data-url="${url}">${text}</a>`;
+    }
+  });
+
+  // 普通链接 [text](url) - 为外部链接添加特殊类
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
     // 检测是否是外部链接（http/https）
     if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -1326,6 +1353,9 @@ function renderMarkdown(markdown) {
     } else if (trimmed.match(/^<(h[1-6]|pre|blockquote|hr|ul|ol|p)/)) {
       // 已经是HTML标签
       result.push(trimmed);
+    } else if (trimmed.match(/^DOWNLOAD_BUTTON_\d+$/)) {
+      // 下载按钮占位符，不包裹在 <p> 中
+      result.push(trimmed);
     } else {
       // 普通段落
       result.push(`<p>${trimmed}</p>`);
@@ -1342,7 +1372,13 @@ function renderMarkdown(markdown) {
   html = html.replace(/<p>(<h[1-6]|ul|ol|pre|blockquote|hr)/g, '$1');
   html = html.replace(/(<\/h[1-6]|<\/ul>|<\/ol>|<\/pre>|<\/blockquote>|<\/hr>)<\/p>/g, '$1');
   html = html.replace(/\n{3,}/g, '\n\n');
-  
+
+  // 最后恢复下载按钮
+  console.log('[renderMarkdown] 恢复按钮数量:', downloadButtons.length);
+  downloadButtons.forEach((btn, i) => {
+    html = html.replace(`DOWNLOAD_BUTTON_${i}`, btn);
+  });
+
   return html;
 }
 
@@ -2081,15 +2117,30 @@ function formatAgentResult(result) {
       if (papers.length === 0) return '未找到相关论文';
       let msg = `📚 找到 ${papers.length} 篇相关论文：\n\n`;
       papers.forEach((p, i) => {
+        // 标题（中文或英文）
         msg += `**${i + 1}. ${p.titleCn || p.title}**\n`;
-        if (p.titleCn && p.titleCn !== p.title) {
-          msg += `   *${p.title}*\n`;
+
+        // 作者
+        msg += `作者: ${p.authorsDisplay || '未知'}\n`;
+
+        // 摘要（统一中文，翻译失败则显示原文并标注）
+        const abstract = p.abstractCn || p.abstract || p.summary || '无摘要';
+        const isOriginal = !p.abstractCn && (p.abstract || p.summary);
+        msg += `摘要: ${abstract.substring(0, 150)}${abstract.length > 150 ? '...' : ''}${isOriginal ? '（原文）' : ''}\n`;
+
+        // 下载按钮（使用 HTML 标记，data-paper 存储论文信息）
+        if (p.pdfUrl) {
+          const paperData = JSON.stringify({
+            pdfUrl: p.pdfUrl,
+            title: p.title,
+            authors: p.authors,
+            arxivId: p.arxivId,
+            published: p.published,
+            url: p.url,
+            abstract: p.abstract || p.summary
+          });
+          msg += `<button class="paper-download-btn" data-paper='${paperData.replace(/'/g, "&#39;")}'>📥 下载论文</button>\n`;
         }
-        msg += `   作者: ${p.authorsDisplay || '未知'}\n`;
-        if (p.abstractCn) {
-          msg += `   摘要: ${p.abstractCn.substring(0, 150)}${p.abstractCn.length > 150 ? '...' : ''}\n`;
-        }
-        if (p.pdfUrl) msg += `   [PDF](${p.pdfUrl})\n`;
         msg += '\n';
       });
       return msg;
@@ -2106,6 +2157,159 @@ function formatAgentResult(result) {
     default:
       return JSON.stringify(data, null, 2);
   }
+}
+
+// 下载并保存 PDF（从聊天界面的 PDF 链接或按钮点击触发）
+async function downloadAndSavePdf(paper, element) {
+  const originalText = element.textContent;
+  try {
+    // 显示下载中状态
+    element.textContent = '下载中...';
+    element.classList.add('downloading');
+    element.disabled = true;
+
+    // 1. 下载 PDF 到临时文件夹
+    const downloadResult = await window.electronAPI.arxiv.download(paper.pdfUrl, paper.title);
+
+    if (!downloadResult.success) {
+      throw new Error(downloadResult.error || '下载失败');
+    }
+
+    console.log('PDF 下载成功:', downloadResult.path);
+
+    // 2. 更新状态为"正在分类"
+    element.textContent = '分类中...';
+
+    // 3. 调用 AI 分类并保存到合适的文件夹
+    const metadata = {
+      title: paper.title,
+      authors: paper.authors,
+      arxivId: paper.arxivId,
+      published: paper.published,
+      url: paper.url,
+      pdfUrl: paper.pdfUrl,
+      abstract: paper.abstract
+    };
+    const saveResult = await window.electronAPI.arxiv.saveToFolder(downloadResult.path, JSON.stringify(metadata));
+
+    if (saveResult.success) {
+      // 成功
+      element.textContent = '已保存 ✓';
+      element.classList.remove('downloading');
+      element.classList.add('saved');
+
+      console.log('论文已保存到:', saveResult.path);
+
+      // 提取目录路径（兼容 Windows 和 Unix 路径）
+      const lastSepIndex = Math.max(saveResult.path.lastIndexOf('/'), saveResult.path.lastIndexOf('\\'));
+      const dirPath = lastSepIndex > 0 ? saveResult.path.substring(0, lastSepIndex) : saveResult.path;
+
+      // 显示保存成功通知
+      showSaveNotification({
+        title: paper.title,
+        path: saveResult.path,
+        dirPath: dirPath
+      });
+
+      // 保存成功后不再恢复按钮状态，保持"已保存"状态
+    } else {
+      throw new Error(saveResult.error || '保存失败');
+    }
+
+  } catch (error) {
+    console.error('下载/保存失败:', error);
+    element.textContent = '失败 ✕';
+    element.classList.remove('downloading');
+    element.classList.add('error');
+    showMainToast('下载失败: ' + error.message, 'error');
+
+    // 3秒后恢复
+    setTimeout(() => {
+      element.textContent = originalText;
+      element.classList.remove('error');
+      element.disabled = false;
+    }, 3000);
+  }
+}
+
+// 显示保存成功通知
+function showSaveNotification(options) {
+  const { title, path, dirPath } = options;
+
+  // 创建通知容器（如果不存在）
+  let container = document.getElementById('saveNotificationContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'saveNotificationContainer';
+    container.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10000;
+    `;
+    document.body.appendChild(container);
+  }
+
+  // 创建通知元素
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    padding: 16px;
+    margin-bottom: 10px;
+    max-width: 400px;
+    animation: slideIn 0.3s ease;
+    border-left: 4px solid #4CAF50;
+  `;
+  notification.innerHTML = `
+    <div style="display: flex; align-items: flex-start; gap: 12px;">
+      <div style="font-size: 24px;">✅</div>
+      <div style="flex: 1;">
+        <div style="font-weight: 600; color: #333; margin-bottom: 4px;">论文保存成功</div>
+        <div style="font-size: 12px; color: #666; margin-bottom: 8px; word-break: break-all;">${title.substring(0, 50)}${title.length > 50 ? '...' : ''}</div>
+        <div style="font-size: 11px; color: #888; word-break: break-all;">${path}</div>
+        <button class="open-folder-btn" style="
+          margin-top: 10px;
+          padding: 6px 12px;
+          background: #4CAF50;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 12px;
+        ">打开文件夹</button>
+      </div>
+      <button class="close-notification" style="
+        background: none;
+        border: none;
+        font-size: 18px;
+        cursor: pointer;
+        color: #999;
+      ">×</button>
+    </div>
+  `;
+
+  container.appendChild(notification);
+
+  // 点击"打开文件夹"按钮
+  notification.querySelector('.open-folder-btn').addEventListener('click', () => {
+    window.electronAPI?.shell?.openPath(dirPath);
+    notification.remove();
+  });
+
+  // 点击关闭按钮
+  notification.querySelector('.close-notification').addEventListener('click', () => {
+    notification.remove();
+  });
+
+  // 6秒后自动消失
+  setTimeout(() => {
+    if (notification.parentNode) {
+      notification.style.animation = 'slideOut 0.3s ease';
+      setTimeout(() => notification.remove(), 300);
+    }
+  }, 6000);
 }
 
 // 移除加载中的消息
@@ -2173,6 +2377,34 @@ function renderMessage(message) {
       const url = link.dataset.url;
       if (url) {
         await window.electronAPI.shell.openExternal(url);
+      }
+    });
+  });
+
+  // 为 PDF 下载链接添加点击处理，直接下载并保存
+  content.querySelectorAll('.pdf-download-link').forEach(link => {
+    link.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        const paperData = JSON.parse(link.dataset.paper);
+        await downloadAndSavePdf(paperData, link);
+      } catch (err) {
+        console.error('PDF 下载失败:', err);
+        showMainToast('下载失败: ' + err.message, 'error');
+      }
+    });
+  });
+
+  // 为论文下载按钮添加点击处理
+  content.querySelectorAll('.paper-download-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        const paperData = JSON.parse(btn.dataset.paper);
+        await downloadAndSavePdf(paperData, btn);
+      } catch (err) {
+        console.error('PDF 下载失败:', err);
+        showMainToast('下载失败: ' + err.message, 'error');
       }
     });
   });

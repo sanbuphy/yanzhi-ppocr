@@ -180,6 +180,7 @@ class ScreenshotManager {
 
     /**
      * 保存截图到知识库
+     * 使用 Agent ClassifySkill 进行智能分类
      * @param {Buffer} screenshot
      * @param {string} explanation AI 解释（可选）
      */
@@ -194,77 +195,42 @@ class ScreenshotManager {
             const tempPath = path.join(tempDir, `screenshot_${Date.now()}.png`);
             fs.writeFileSync(tempPath, screenshot);
 
-            // 调用 Python 的 choose_to_save.py 进行分类保存
-            const result = await this.callPythonClassifier(tempPath, explanation);
+            // 使用 Agent 的 ClassifySkill 进行分类
+            const { getAgent } = require('../agent');
+            const classifyResult = await getAgent().classify({
+                content: tempPath,
+                contentType: 'image'
+            });
 
             // 清理临时文件
             fs.unlinkSync(tempPath);
 
-            return result;
+            if (!classifyResult.success) {
+                return { success: false, error: classifyResult.error };
+            }
+
+            // 确保目录存在
+            const dirPath = path.dirname(classifyResult.savePath);
+            if (!fs.existsSync(dirPath)) {
+                fs.mkdirSync(dirPath, { recursive: true });
+            }
+
+            // 保存截图
+            fs.writeFileSync(classifyResult.savePath, screenshot);
+
+            // 如果有 AI 解释，保存为伴随的 markdown 文件
+            if (explanation) {
+                const mdPath = classifyResult.savePath.replace(/\.(png|jpg|jpeg)$/i, '.md');
+                fs.writeFileSync(mdPath, `# 截图说明\n\n${explanation}`, 'utf-8');
+            }
+
+            console.log('[Screenshot] 截图已保存到:', classifyResult.savePath);
+            return { success: true, path: classifyResult.savePath };
+
         } catch (error) {
             console.error('保存到知识库失败:', error);
             throw error;
         }
-    }
-
-    /**
-     * 调用 Python 分类器
-     */
-    async callPythonClassifier(imagePath, explanation) {
-        const { spawn } = require('child_process');
-        const toolsDir = path.join(__dirname, '../../tools');
-
-        return new Promise((resolve, reject) => {
-            const pythonCode = `
-import sys
-import json
-sys.path.insert(0, r'${toolsDir.replace(/\\/g, '/')}')
-
-try:
-    from choose_to_save import ContentManager, InputType
-    from PIL import Image
-
-    manager = ContentManager()
-    img = Image.open(r'${imagePath.replace(/\\/g, '/')}')
-
-    description = ${explanation ? JSON.stringify(explanation) : 'None'}
-    result = manager.save_content(InputType.IMAGE, img, description=description)
-
-    print("RESULT:" + json.dumps({"success": True, "path": result} if result else {"success": False, "error": "保存失败"}))
-except Exception as e:
-    print("RESULT:" + json.dumps({"success": False, "error": str(e)}))
-`;
-
-            const proc = spawn('python', ['-c', pythonCode], {
-                cwd: toolsDir,
-                env: {
-                    ...process.env,
-                    PYTHONIOENCODING: 'utf-8',
-                    PYTHONUTF8: '1'
-                }
-            });
-
-            let output = '';
-            proc.stdout.on('data', (data) => {
-                output += data.toString('utf-8');
-            });
-
-            proc.on('close', (code) => {
-                const match = output.match(/RESULT:(.+)/);
-                if (match) {
-                    try {
-                        const result = JSON.parse(match[1]);
-                        resolve(result);
-                    } catch (e) {
-                        reject(new Error('解析 Python 结果失败'));
-                    }
-                } else {
-                    reject(new Error('Python 脚本无输出'));
-                }
-            });
-
-            proc.on('error', reject);
-        });
     }
 
     /**

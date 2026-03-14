@@ -478,7 +478,7 @@ except Exception as e:
     }
 
     /**
-     * 保存文本到知识库（调用 Python choose_to_save.py）
+     * 保存文本到知识库（使用 Agent ClassifySkill 进行智能分类）
      * @param {string} text
      * @param {string} description
      * @returns {Promise<object>}
