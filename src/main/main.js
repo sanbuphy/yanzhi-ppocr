@@ -1202,9 +1202,9 @@ function renderMarkdown(markdown) {
   // 使用更宽松的正则：允许 data-paper 属性值包含任何字符（包括换行符），非贪婪匹配
   html = html.replace(/<button class="paper-download-btn" data-paper='[\s\S]*?'>[\s\S]*?<\/button>/g, (match) => {
     console.log('[renderMarkdown] ✅ 匹配到下载按钮');
-    const id = `DOWNLOAD_BUTTON_${downloadButtons.length}`;
+    const placeholder = `@@DLBTN${downloadButtons.length}@@`;
     downloadButtons.push(match);
-    return id;
+    return placeholder;
   });
   if (downloadButtons.length === 0 && originalHtml.includes('paper-download-btn')) {
     console.warn('[renderMarkdown] ⚠️ 存在按钮但正则未匹配！请检查按钮 HTML 格式');
@@ -1245,8 +1245,8 @@ function renderMarkdown(markdown) {
     return '<em>' + text + '</em>';
   });
   html = html.replace(/_([^_\n]+?)_/g, (match, text) => {
-    // 如果包含代码标记或下载按钮占位符，跳过
-    if (match.includes('CODE_BLOCK') || match.includes('INLINE_CODE') || match.includes('DOWNLOAD_BUTTON')) {
+    // 如果包含代码标记，跳过
+    if (match.includes('CODE_BLOCK') || match.includes('INLINE_CODE')) {
       return match;
     }
     return '<em>' + text + '</em>';
@@ -1353,7 +1353,7 @@ function renderMarkdown(markdown) {
     } else if (trimmed.match(/^<(h[1-6]|pre|blockquote|hr|ul|ol|p)/)) {
       // 已经是HTML标签
       result.push(trimmed);
-    } else if (trimmed.match(/^DOWNLOAD_BUTTON_\d+$/)) {
+    } else if (trimmed.match(/^@@DLBTN\d+@@$/)) {
       // 下载按钮占位符，不包裹在 <p> 中
       result.push(trimmed);
     } else {
@@ -1376,7 +1376,7 @@ function renderMarkdown(markdown) {
   // 最后恢复下载按钮
   console.log('[renderMarkdown] 恢复按钮数量:', downloadButtons.length);
   downloadButtons.forEach((btn, i) => {
-    html = html.replace(`DOWNLOAD_BUTTON_${i}`, btn);
+    html = html.replace(`@@DLBTN${i}@@`, btn);
   });
 
   return html;
