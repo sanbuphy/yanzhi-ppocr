@@ -82,7 +82,7 @@ class AIClient {
 
     /**
      * 初始化 AI 客户端
-     * 优先级：GitHub Models (GPT-4o) > SiliconFlow Qwen3.5 (多模态) > OCR + Qwen2.5
+     * 优先级：SiliconFlow Qwen2.5 + OCR > GitHub Models (GPT-4o)
      */
     _initClient() {
         this._loadEnvFile();
@@ -102,7 +102,16 @@ class AIClient {
         const siliconToken = process.env.SILICONFLOW_API_KEY;
         this.siliconToken = siliconToken || null;
 
-        if (githubToken) {
+        if (siliconToken) {
+            // 使用 SiliconFlow Qwen2.5（配合 OCR 处理图片）
+            this.client = new OpenAI({
+                baseURL: 'https://api.siliconflow.cn/v1',
+                apiKey: siliconToken
+            });
+            this.modelName = 'Qwen/Qwen2.5-7B-Instruct';
+            this.isVLM = false;
+            console.log(`✅ 使用 SiliconFlow Qwen2.5 + OCR: ${this.modelName}`);
+        } else if (githubToken) {
             // 使用 GitHub Models (GPT-4o 支持视觉)
             this.client = new OpenAI({
                 baseURL: 'https://models.github.ai/inference',
@@ -111,15 +120,6 @@ class AIClient {
             this.modelName = 'openai/gpt-4o';
             this.isVLM = true;
             console.log(`✅ 使用 GitHub Models: ${this.modelName}`);
-        } else if (siliconToken) {
-            // 使用 SiliconFlow Qwen3.5 (多模态模型，支持视觉)
-            this.client = new OpenAI({
-                baseURL: 'https://api.siliconflow.cn/v1',
-                apiKey: siliconToken
-            });
-            this.modelName = 'Qwen/Qwen3.5-9B';
-            this.isVLM = true;
-            console.log(`✅ 使用 SiliconFlow Qwen3.5 (多模态): ${this.modelName}`);
         } else {
             throw new Error('请设置环境变量：GITHUB_TOKEN 或 SILICONFLOW_API_KEY');
         }
@@ -583,7 +583,7 @@ class AIClient {
             }
 
             // 如果是 SiliconFlow Qwen3.5 且有图片，尝试回退到 OCR + Qwen2.5
-            if (this.modelName === 'Qwen/Qwen3.5-9B' && imagePath && this.siliconToken) {
+            if (this.modelName === 'Qwen/Qwen3-VL-8B-Instruct' && imagePath && this.siliconToken) {
                 console.warn(`⚠️ Qwen3.5 请求失败，尝试回退到 OCR + Qwen2.5: ${e.message}`);
                 return await this._fallbackToOcrAndQwen25(text, imagePath, temperature, maxTokens, timeoutMs, signal, ocrDebug);
             }
@@ -784,7 +784,7 @@ class AIClient {
             }
 
             // 如果是 SiliconFlow Qwen3.5 且有图片，尝试回退到 OCR + Qwen2.5
-            if (this.modelName === 'Qwen/Qwen3.5-9B' && imagePath && this.siliconToken) {
+            if (this.modelName === 'Qwen/Qwen3-VL-8B-Instruct' && imagePath && this.siliconToken) {
                 console.warn(`⚠️ Qwen3.5 流式请求失败，尝试回退到 OCR + Qwen2.5: ${e.message}`);
                 return await this._fallbackStreamToOcrAndQwen25(text, imagePath, onChunk, timeoutMs, signal);
             }
