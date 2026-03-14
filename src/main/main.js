@@ -596,6 +596,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // 处理从其他页面跳转过来的待处理文件
 async function handlePendingFile() {
+  // 检查是否有从recommend页面跳转的待显示文件
+  const displayFilePath = sessionStorage.getItem('displayFilePath');
+  if (displayFilePath) {
+    sessionStorage.removeItem('displayFilePath');
+    console.log('[DisplayFile] 显示文件:', displayFilePath);
+    
+    // 获取文件名和类型
+    const fileName = displayFilePath.split(/[/\\]/).pop();
+    const fileType = getFileExtension(fileName);
+    
+    // 创建虚拟文件对象
+    const fileObj = {
+      name: fileName,
+      path: displayFilePath,
+      fileType: fileType,
+      size: 0, // 未知
+      modified: new Date().toISOString()
+    };
+    
+    // 设置为当前文件并显示
+    currentFile = fileObj;
+    await displayFileFromPath(displayFilePath, fileName, fileType);
+    return;
+  }
+  
   const pendingFileStr = sessionStorage.getItem('pendingFile');
   if (!pendingFileStr) return;
   

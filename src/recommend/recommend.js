@@ -446,29 +446,35 @@ function createArticleCard(article) {
       </svg>
       <span>下载PDF</span>
     `;
-    downloadBtn.addEventListener('click', async (e) => {
+    downloadBtn.onclick = async (e) => {
       e.stopPropagation();
       await downloadAndSavePaper(article, downloadBtn);
-    });
+    };
     actions.appendChild(downloadBtn);
   }
 
   // 如果已经存储，显示状态
   if (article.stored) {
     const storedTag = document.createElement('div');
-    storedTag.className = 'article-stored-tag';
-    storedTag.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
-        <polyline points="20 6 9 17 4 12"></polyline>
-      </svg>
-      <span style="color: #22c55e; font-size: 12px; margin-left: 4px;">已在库</span>
-    `;
-    actions.appendChild(storedTag);
+    // storedTag.className = 'article-stored-tag';
+    // storedTag.innerHTML = `
+    //   <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
+    //     <polyline points="20 6 9 17 4 12"></polyline>
+    //   </svg>
+    //   <span style="color: #22c55e; font-size: 12px; margin-left: 4px;">已在库</span>
+    // `;
+    // actions.appendChild(storedTag);
     // 下载按钮可以视觉上弱化
     const downloadBtn = actions.querySelector('.article-download-btn');
     if (downloadBtn) {
         downloadBtn.style.opacity = '0.5';
-        downloadBtn.querySelector('span').textContent = '重新下载';
+        downloadBtn.querySelector('span').textContent = '已保存';
+        
+        // 修改onclick为跳转到main页面显示文献详情
+        downloadBtn.onclick = () => {
+            sessionStorage.setItem('displayFilePath', article.localPath);
+            window.location.href = '../main/main.html';
+        };
     }
   }
   
@@ -564,6 +570,20 @@ async function downloadAndSavePaper(article, button) {
         <span>已保存</span>
       `;
       button.classList.add('success');
+      button.disabled = false;
+
+      button.onclick = () => {
+        // 存储要显示的文件路径到sessionStorage
+        sessionStorage.setItem('displayFilePath', saveResult.path);
+        // 跳转到main页面
+        window.location.href = '../main/main.html';
+      };
+
+      // 移除"已在库"标签（如果存在）
+      const storedTag = button.closest('.article-actions')?.querySelector('.article-stored-tag');
+      if (storedTag) {
+        storedTag.remove();
+      }
 
       console.log('论文已保存到:', saveResult.path);
 
@@ -582,6 +602,8 @@ async function downloadAndSavePaper(article, button) {
           window.electronAPI?.shell?.openPath(dirPath);
         }
       });
+      
+      return; // 保存成功后直接返回，防止再次下载
     } else {
       throw new Error(saveResult.error || '保存失败');
     }
