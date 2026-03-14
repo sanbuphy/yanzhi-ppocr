@@ -456,14 +456,14 @@ function createArticleCard(article) {
   // 如果已经存储，显示状态
   if (article.stored) {
     const storedTag = document.createElement('div');
-    // storedTag.className = 'article-stored-tag';
-    // storedTag.innerHTML = `
-    //   <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
-    //     <polyline points="20 6 9 17 4 12"></polyline>
-    //   </svg>
-    //   <span style="color: #22c55e; font-size: 12px; margin-left: 4px;">已在库</span>
-    // `;
-    // actions.appendChild(storedTag);
+    storedTag.className = 'article-stored-tag';
+    storedTag.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      <span style="color: #22c55e; font-size: 12px; margin-left: 4px;">已在库</span>
+    `;
+    actions.appendChild(storedTag);
     // 下载按钮可以视觉上弱化
     const downloadBtn = actions.querySelector('.article-download-btn');
     if (downloadBtn) {
@@ -579,10 +579,17 @@ async function downloadAndSavePaper(article, button) {
         window.location.href = '../main/main.html';
       };
 
-      // 移除"已在库"标签（如果存在）
-      const storedTag = button.closest('.article-actions')?.querySelector('.article-stored-tag');
-      if (storedTag) {
-        storedTag.remove();
+      const actions = button.closest('.article-actions');
+      if (actions && !actions.querySelector('.article-stored-tag')) {
+        const storedTag = document.createElement('div');
+        storedTag.className = 'article-stored-tag';
+        storedTag.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span style="color: #22c55e; font-size: 12px; margin-left: 4px;">已在库</span>
+        `;
+        actions.appendChild(storedTag);
       }
 
       console.log('论文已保存到:', saveResult.path);
