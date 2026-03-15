@@ -98,6 +98,7 @@ body::after {
   position: relative;
   transition: width 0.3s ease;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 20; /* Ensure dropdowns appear above middle panel */
 }
 
 /* Collapse buttons */
@@ -291,6 +292,7 @@ body::after {
   cursor: pointer;
   transition: all 0.3s ease;
   backdrop-filter: blur(10px);
+  min-width: 100px; /* 增加最小宽度 */
 }
 
 .action-btn:hover {
@@ -330,17 +332,21 @@ body::after {
 
 /* Dropdown Menu */
 .dropdown-menu {
-  position: fixed;
-  background: rgba(255, 255, 255, 0.03);
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background: rgba(31, 31, 31, 0.95);
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   z-index: 1000;
   display: none;
   overflow: visible;
-  min-width: 200px;
+  min-width: 160px;
+  margin-top: 5px;
 }
 
 .dropdown-menu.show {
@@ -380,6 +386,16 @@ body::after {
   justify-content: space-between;
 }
 
+.dropdown-item.has-submenu::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -10px; /* 覆盖间隙 */
+  width: 10px;
+  height: 100%;
+  background: transparent;
+}
+
 .submenu-arrow {
   width: 12px;
   height: 12px;
@@ -399,7 +415,7 @@ body::after {
   background: #1f1f1f;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   z-index: 1001;
   display: none;
   min-width: 180px;

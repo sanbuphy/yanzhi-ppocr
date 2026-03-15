@@ -1,15 +1,29 @@
 {
-  "lastScanTime": "2026-03-14T04:30:43.016Z",
-  "totalFiles": 16,
-  "folderCount": 6,
-  "mdFileCount": 7,
-  "pdfFileCount": 7,
+  "lastScanTime": "2026-03-15T02:02:50.957Z",
+  "totalFiles": 18,
+  "folderCount": 9,
+  "mdFileCount": 8,
+  "pdfFileCount": 8,
   "imageCount": 2,
   "otherCount": 0,
   "monthlyNewFiles": 1,
   "monthlyNewNotes": 1,
   "monthlyNewImages": 0,
   "recentFiles": [
+    {
+      "name": "DF.md",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\DF\\DF.md",
+      "folder": "DF",
+      "addedTime": "2026-03-15T01:50:04.520Z",
+      "size": 43
+    },
+    {
+      "name": "RETA-LLM_ A Retrieval-Augmented Large Language Model Toolkit.pdf",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\文章\\RETA-LLM_ A Retrieval-Augmented Large Language Model Toolkit.pdf",
+      "folder": "LLM",
+      "addedTime": "2026-03-15T01:23:52.356Z",
+      "size": 422225
+    },
     {
       "name": "document_1773424109704.pdf",
       "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\VLN\\文章\\document_1773424109704.pdf",
@@ -30,24 +44,23 @@
       "folder": "RL",
       "addedTime": "2026-03-13T17:23:17.994Z",
       "size": 94
-    },
-    {
-      "name": "概念解释模板笔记.md",
-      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\概念解释模板笔记.md",
-      "folder": "root",
-      "addedTime": "2026-03-13T15:23:45.043Z",
-      "size": 94,
-      "ext": "md"
-    },
-    {
-      "name": "Think Before You Lie_ How Reasoning Improves Honesty.pdf",
-      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\文章\\Think Before You Lie_ How Reasoning Improves Honesty.pdf",
-      "folder": "LLM",
-      "addedTime": "2026-03-11T10:30:21.920Z",
-      "size": 7160409
     }
   ],
   "recentMonthFiles": [
+    {
+      "name": "DF.md",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\DF\\DF.md",
+      "folder": "DF",
+      "addedTime": "2026-03-15T01:50:04.520Z",
+      "size": 43
+    },
+    {
+      "name": "RETA-LLM_ A Retrieval-Augmented Large Language Model Toolkit.pdf",
+      "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\文章\\RETA-LLM_ A Retrieval-Augmented Large Language Model Toolkit.pdf",
+      "folder": "LLM",
+      "addedTime": "2026-03-15T01:23:52.356Z",
+      "size": 422225
+    },
     {
       "name": "document_1773424109704.pdf",
       "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\VLN\\文章\\document_1773424109704.pdf",
@@ -94,10 +107,22 @@
   ],
   "folders": [
     {
+      "name": "DF",
+      "fileCount": 1,
+      "totalSize": 43,
+      "detailFile": "DF_b98f8303.json"
+    },
+    {
       "name": "LLM",
-      "fileCount": 6,
-      "totalSize": 17480355,
+      "fileCount": 7,
+      "totalSize": 17902580,
       "detailFile": "LLM_b8cc08c1.json"
+    },
+    {
+      "name": "NLP",
+      "fileCount": 0,
+      "totalSize": 0,
+      "detailFile": "NLP_85587c49.json"
     },
     {
       "name": "RL",
@@ -110,6 +135,12 @@
       "fileCount": 2,
       "totalSize": 3701594,
       "detailFile": "VLN_02a13f71.json"
+    },
+    {
+      "name": "其他",
+      "fileCount": 0,
+      "totalSize": 0,
+      "detailFile": "其他_0d98c747.json"
     },
     {
       "name": "多模态大模型",

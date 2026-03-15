@@ -340,6 +340,32 @@ ipcMain.handle('workspace:setActive', async (event, folderPath) => {
     workspaceScanner.stop();
     const activated = workspaceScanner.setActiveWorkspace(folderPath);
 
+    // 自动创建“其他”文件夹（系统默认）及其子文件夹
+    const otherPath = path.join(folderPath, '其他');
+    if (!fs.existsSync(otherPath)) {
+      try {
+        fs.mkdirSync(otherPath, { recursive: true });
+        console.log('✅ 已自动创建“其他”文件夹');
+      } catch (e) {
+        console.error('❌ 创建“其他”文件夹失败:', e);
+      }
+    }
+    
+    // 确保“其他”文件夹下的子文件夹存在
+    if (fs.existsSync(otherPath)) {
+      const subFolders = ['images', '博客', '文章'];
+      subFolders.forEach(sub => {
+        const subPath = path.join(otherPath, sub);
+        if (!fs.existsSync(subPath)) {
+          try {
+            fs.mkdirSync(subPath, { recursive: true });
+          } catch (e) {
+            console.error(`❌ 创建子文件夹 ${sub} 失败:`, e);
+          }
+        }
+      });
+    }
+
     // 立即扫描一次，再进入定时扫描
     await workspaceScanner.scan();
     workspaceScanner.start(WORKSPACE_SCAN_INTERVAL_MS);
@@ -742,9 +768,16 @@ ipcMain.handle('folder:create', async (event, folderName, basePath) => {
         fs.mkdirSync(subDirPath, { recursive: true });
       }
     }
+
+    // 创建默认的 markdown 文件
+    const mdContent = `# ${folderName}\n\n在这里记录关于 ${folderName} 的笔记...`;
+    const mdFilePath = path.join(fullPath, `${folderName}.md`);
+    if (!fs.existsSync(mdFilePath)) {
+      fs.writeFileSync(mdFilePath, mdContent, 'utf-8');
+    }
     
     console.log('[CreateFolder] 成功创建文件夹及其子目录:', fullPath);
-    return { success: true, path: fullPath, description: '新建子文件夹（已包含 images/博客/文章）' };
+    return { success: true, path: fullPath, description: '新建子文件夹（已包含 images/博客/文章 及默认笔记）' };
   } catch (error) {
     console.error('[CreateFolder Error] 创建文件夹失败:', error);
     return { success: false, error: error.message };
