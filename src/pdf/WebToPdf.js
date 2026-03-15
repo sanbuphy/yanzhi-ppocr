@@ -346,7 +346,9 @@ class WebToPdf {
             const agent = getAgent();
             classifyResult = await agent.classify({
                 content: pdfPath,
-                contentType: 'pdf'
+                contentType: 'pdf',
+                sourceType: 'web',
+                titleHint: title || ''
             });
         } catch (e) {
             console.error('[PDF] 智能分类失败:', e);

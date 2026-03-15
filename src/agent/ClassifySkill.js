@@ -12,6 +12,7 @@ class ClassifySkill {
         this.workspaceScanner = workspaceScanner;
         this.maxTextLength = 1000;
         this.maxPdfPages = 3;
+        this.maxTitleLength = 20;
     }
 
     /**
@@ -225,6 +226,63 @@ ${content.substring(0, 500)}
             .join('\n');
     }
 
+    _sanitizeFilenamePart(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+
+        let cleaned = raw
+            .replace(/[\\/:*?"<>|]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        cleaned = cleaned.replace(/[\.\s]+$/g, '').replace(/^[\.\s]+/g, '');
+
+        return cleaned;
+    }
+
+    _truncateTitle(value, maxLen = this.maxTitleLength) {
+        const list = Array.from(String(value || ''));
+        if (list.length <= maxLen) return list.join('');
+        return list.slice(0, maxLen).join('');
+    }
+
+    _ensureUniquePath(filePath) {
+        if (!filePath) return filePath;
+        if (!fs.existsSync(filePath)) return filePath;
+
+        const parsed = path.parse(filePath);
+        let index = 1;
+        let candidate = '';
+
+        do {
+            candidate = path.join(parsed.dir, `${parsed.name}_${index}${parsed.ext}`);
+            index += 1;
+        } while (fs.existsSync(candidate));
+
+        return candidate;
+    }
+
+    _buildAiTitlePrompt(typeLabel, titleHint, contentSnippet) {
+        const titleLine = titleHint ? `\n原始标题：${titleHint}\n` : '\n';
+        return `请基于以下内容生成一个用于文件命名的中文短标题。\n` +
+            `要求：\n` +
+            `1. 仅返回标题本身，不要任何解释或标点装饰。\n` +
+            `2. 标题长度不超过 ${this.maxTitleLength} 个字。\n` +
+            `3. 避免使用特殊字符。\n` +
+            `4. 类型：${typeLabel}。${titleLine}` +
+            `内容摘要：\n${contentSnippet}\n`;
+    }
+
+    async _generateAiTitle(typeLabel, titleHint, extractedContent) {
+        const snippet = String(extractedContent || '').trim().slice(0, 500);
+        const client = getAIClient('你是一个文件命名助手，擅长为内容生成简短中文标题。');
+        const prompt = this._buildAiTitlePrompt(typeLabel, titleHint, snippet || '暂无内容');
+        const response = await client.ask(prompt, null, 0.2, 60);
+        const normalized = this._sanitizeFilenamePart(response);
+        const truncated = this._truncateTitle(normalized || titleHint || '');
+        return truncated;
+    }
+
     /**
      * 调用 AI 选择目标文件夹
      * @param {string} content - 内容描述
@@ -276,14 +334,27 @@ ${foldersInfo}
      * @param {string} fileName - 原始文件名
      * @returns {string} 完整保存路径
      */
-    _buildSavePath(targetFolder, fileType, isBlog, fileName) {
+    async _buildSavePath(targetFolder, fileType, isBlog, fileName, options = {}) {
+        const { sourceType, titleHint, extractedContent, contentPath } = options;
+
         // 图片类型：保存到目标文件夹下的 "images" 子文件夹
         if (fileType === 'image') {
             const imageFolder = path.join(targetFolder, 'images');
-            const baseName = fileName ? path.basename(fileName) : `image_${Date.now()}.png`;
+            const ext = path.extname(fileName || contentPath || '') || '.png';
+            let baseTitle = '';
+            try {
+                baseTitle = await this._generateAiTitle('图片', titleHint, extractedContent);
+            } catch (e) {
+                baseTitle = this._truncateTitle(this._sanitizeFilenamePart(titleHint || ''));
+            }
+            if (!baseTitle) {
+                baseTitle = 'pic';
+            }
+            const baseName = `[pic]_${baseTitle}${ext}`;
+            const savePath = this._ensureUniquePath(path.join(imageFolder, baseName));
             return {
                 targetFolder: imageFolder,
-                savePath: path.join(imageFolder, baseName)
+                savePath
             };
         }
 
@@ -291,19 +362,39 @@ ${foldersInfo}
         if (isBlog) {
             const blogFolder = path.join(targetFolder, '博客');
             const baseName = fileName ? path.basename(fileName, path.extname(fileName)) + '.md' : `note_${Date.now()}.md`;
+            const savePath = this._ensureUniquePath(path.join(blogFolder, baseName));
             return {
                 targetFolder: blogFolder,
-                savePath: path.join(blogFolder, baseName)
+                savePath
             };
         }
 
         // PDF 类型：保存到目标文件夹下的 "文章" 子文件夹
         if (fileType === 'pdf') {
             const articleFolder = path.join(targetFolder, '文章');
-            const baseName = fileName ? path.basename(fileName) : `document_${Date.now()}.pdf`;
+            let baseName = '';
+
+            if (sourceType === 'web') {
+                let baseTitle = '';
+                try {
+                    baseTitle = await this._generateAiTitle('网页', titleHint, extractedContent);
+                } catch (e) {
+                    baseTitle = this._truncateTitle(this._sanitizeFilenamePart(titleHint || ''));
+                }
+                if (!baseTitle) {
+                    baseTitle = 'web';
+                }
+                baseName = `[web]_${baseTitle}.pdf`;
+            } else if (fileName) {
+                baseName = path.basename(fileName);
+            } else {
+                baseName = 'document.pdf';
+            }
+
+            const savePath = this._ensureUniquePath(path.join(articleFolder, baseName));
             return {
                 targetFolder: articleFolder,
-                savePath: path.join(articleFolder, baseName)
+                savePath
             };
         }
 
@@ -311,16 +402,17 @@ ${foldersInfo}
         if (fileType === 'text') {
             const folderName = path.basename(targetFolder);
             const baseName = fileName ? path.basename(fileName, path.extname(fileName)) + '.md' : `${folderName}.md`;
+            const savePath = this._ensureUniquePath(path.join(targetFolder, baseName));
             return {
                 targetFolder: targetFolder,
-                savePath: path.join(targetFolder, baseName)
+                savePath
             };
         }
 
         // 其他类型
         return {
             targetFolder: targetFolder,
-            savePath: path.join(targetFolder, fileName || 'unknown')
+            savePath: this._ensureUniquePath(path.join(targetFolder, fileName || 'unknown'))
         };
     }
 
@@ -329,11 +421,13 @@ ${foldersInfo}
      * @param {Object} options - 分类选项
      * @param {string} options.content - 文本内容或文件路径
      * @param {string} options.contentType - 内容类型 'text' | 'image' | 'pdf' | 'auto'
-     * @param {string} options.fileName - 可选，文件名（用于博客判断和保存命名）
+    * @param {string} options.fileName - 可选，文件名（用于博客判断和保存命名）
+    * @param {string} options.sourceType - 可选，来源类型（如 'web'）
+    * @param {string} options.titleHint - 可选，标题提示（如网页标题）
      * @returns {Promise<Object>} 分类结果
      */
     async classify(options) {
-        const { content, contentType = 'auto', fileName } = options;
+        const { content, contentType = 'auto', fileName, sourceType, titleHint } = options;
 
         // 验证输入
         if (!content) {
@@ -423,7 +517,12 @@ ${foldersInfo}
             }
 
             // 构建保存路径
-            const pathInfo = this._buildSavePath(targetFolder, fileType, isBlog, fileName);
+            const pathInfo = await this._buildSavePath(targetFolder, fileType, isBlog, fileName, {
+                sourceType,
+                titleHint,
+                extractedContent,
+                contentPath: content
+            });
 
             return {
                 success: true,
