@@ -22,7 +22,7 @@ body::before {
   left: -160px;
   width: 384px;
   height: 384px;
-  background: rgba(180, 244, 101, 0.2);
+  background: rgba(194, 242, 121, 0.2);
   border-radius: 50%;
   filter: blur(120px);
   pointer-events: none;
@@ -36,7 +36,7 @@ body::after {
   right: -160px;
   width: 480px;
   height: 480px;
-  background: rgba(180, 244, 101, 0.1);
+  background: rgba(194, 242, 121, 0.1);
   border-radius: 50%;
   filter: blur(150px);
   pointer-events: none;
@@ -72,6 +72,19 @@ body::after {
   font-size: 18px;
   font-weight: 600;
   color: #ffffff;
+  display: flex;
+  align-items: center;
+}
+
+.panel-header h2::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 16px;
+  background-color: #C2F279;
+  margin-right: 10px;
+  border-radius: 2px;
+  box-shadow: 0 0 8px #C2F279;
 }
 
 /* Left Panel */
@@ -108,7 +121,7 @@ body::after {
 
 .collapse-btn:hover {
   background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(180, 244, 101, 0.3);
+  border-color: rgba(194, 242, 121, 0.3);
 }
 
 .collapse-left-btn {
@@ -201,19 +214,24 @@ body::after {
 }
 
 .search-container {
+  position: relative;
   display: flex;
   align-items: center;
   padding: 15px 20px;
   background: transparent;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  gap: 10px;
 }
 
 .search-icon {
-  width: 18px;
-  height: 18px;
+  position: absolute;
+  right: 32px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
   opacity: 0.6;
-  filter: brightness(0) invert(1);
+  color: rgba(255, 255, 255, 0.6);
+  pointer-events: none;
 }
 
 .search-input {
@@ -221,7 +239,7 @@ body::after {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  padding: 8px 12px;
+  padding: 8px 36px 8px 12px;
   color: #ffffff;
   font-size: 14px;
   outline: none;
@@ -234,9 +252,9 @@ body::after {
 }
 
 .search-input:focus {
-  border-color: #b4f465;
+  border-color: #C2F279;
   background: rgba(255, 255, 255, 0.05);
-  box-shadow: 0 0 20px rgba(180, 244, 101, 0.2);
+  box-shadow: 0 0 20px rgba(194, 242, 121, 0.2);
 }
 
 .action-buttons {
@@ -275,9 +293,9 @@ body::after {
 }
 
 .action-btn:hover {
-  background: rgba(180, 244, 101, 0.15);
-  border-color: rgba(180, 244, 101, 0.3);
-  color: #b4f465;
+  background: rgba(194, 242, 121, 0.15);
+  border-color: rgba(194, 242, 121, 0.3);
+  color: #C2F279;
 }
 
 .action-btn:disabled {
@@ -343,8 +361,8 @@ body::after {
 }
 
 .dropdown-item:hover {
-  background: rgba(180, 244, 101, 0.15);
-  color: #b4f465;
+  background: rgba(194, 242, 121, 0.15);
+  color: #C2F279;
 }
 
 .dropdown-item:first-child {
@@ -373,16 +391,17 @@ body::after {
 }
 
 .submenu {
-  position: fixed;
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
+  position: absolute;
+  top: 0;
+  left: 100%;
+  margin-left: 8px;
+  background: #1f1f1f;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.1);
-  min-width: 180px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  z-index: 1001;
   display: none;
-  z-index: 5001;
+  min-width: 180px;
   white-space: nowrap;
   padding: 4px 0;
 }
@@ -448,8 +467,8 @@ body::after {
 }
 
 .status-dot.watching {
-  background: #b4f465;
-  box-shadow: 0 0 12px rgba(180, 244, 101, 0.5);
+  background: #C2F279;
+  box-shadow: 0 0 12px rgba(194, 242, 121, 0.5);
 }
 
 .status-dot.refreshing {
@@ -492,12 +511,12 @@ body::after {
 }
 
 .file-tree::-webkit-scrollbar-thumb {
-  background: rgba(180, 244, 101, 0.3);
+  background: rgba(194, 242, 121, 0.3);
   border-radius: 3px;
 }
 
 .file-tree::-webkit-scrollbar-thumb:hover {
-  background: rgba(180, 244, 101, 0.5);
+  background: rgba(194, 242, 121, 0.5);
 }
 
 .folder-item,
@@ -513,15 +532,15 @@ body::after {
 
 .folder-item:hover,
 .file-item:hover {
-  background: rgba(180, 244, 101, 0.1);
-  color: #b4f465;
+  background: rgba(194, 242, 121, 0.1);
+  color: #C2F279;
 }
 
 .folder-item.active,
 .file-item.active {
-  background: rgba(180, 244, 101, 0.15);
-  border-left: 3px solid #b4f465;
-  color: #b4f465;
+  background: rgba(194, 242, 121, 0.15);
+  border-left: 3px solid #C2F279;
+  color: #C2F279;
 }
 
 .folder-icon,
@@ -566,8 +585,8 @@ body::after {
   flex-direction: column;
   gap: 10px;
   padding: 15px 20px;
-  border-top: 1px solid #333333;
-  background: #1f1f1f;
+  border-top: none;
+  background: transparent;
 }
 
 .nav-icon {
@@ -589,8 +608,8 @@ body::after {
 }
 
 .nav-icon.active {
-  background: #4ade80;
-  box-shadow: 0 0 10px rgba(74, 158, 255, 0.5);
+  background: #C2F279;
+  box-shadow: 0 0 10px rgba(194, 242, 121, 0.5);
 }
 
 .nav-icon img {
@@ -643,7 +662,7 @@ body::after {
 }
 
 .display-area::-webkit-scrollbar-thumb {
-  background: rgba(180, 244, 101, 0.3);
+  background: rgba(194, 242, 121, 0.3);
   border-radius: 4px;
 }
 
@@ -653,8 +672,8 @@ body::after {
 }
 
 .empty-icon {
-  width: 120px;
-  height: 120px;
+  width: 64px;
+  height: 64px;
   opacity: 0.2;
   margin-bottom: 20px;
   filter: brightness(0) invert(1);
@@ -984,7 +1003,7 @@ img.file-preview {
 
 .new-template-btn:hover {
   background: #333333;
-  border-color: #4ade80;
+  border-color: #C2F279;
 }
 
 /* Template Editor View */
@@ -1073,8 +1092,8 @@ img.file-preview {
 
 .editor-input:focus,
 .editor-textarea:focus {
-  border-color: #4ade80;
-  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
+  border-color: #C2F279;
+  box-shadow: 0 0 0 3px rgba(194, 242, 121, 0.1);
 }
 
 .editor-input::placeholder,
@@ -1119,29 +1138,27 @@ img.file-preview {
 
 .editor-btn.cancel-btn:hover {
   background: #333333;
-  border-color: #4ade80;
+  border-color: #C2F279;
 }
 
 .editor-btn.save-btn {
-  background: #4ade80;
-  color: #ffffff;
+  background: #C2F279;
+  color: #0d130f;
 }
 
 .editor-btn.save-btn:hover {
-  background: #3a8eef;
+  background: rgba(194, 242, 121, 0.8);
 }
 
 /* Right Panel */
 .right-panel {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
+  background: transparent;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   position: relative;
-  min-height: 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  transition: width 0.3s ease;
+  overflow: visible;
 }
 
 .chat-messages {
@@ -1163,7 +1180,7 @@ img.file-preview {
 }
 
 .chat-messages::-webkit-scrollbar-thumb {
-  background: rgba(180, 244, 101, 0.3);
+  background: rgba(194, 242, 121, 0.3);
   border-radius: 3px;
 }
 
@@ -1186,7 +1203,7 @@ img.file-preview {
 }
 
 .message.user .message-avatar {
-  background: #b4f465;
+  background: #C2F279;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1200,7 +1217,7 @@ img.file-preview {
 }
 
 .message.ai .message-avatar {
-  background: rgba(180, 244, 101, 0.2);
+  background: rgba(194, 242, 121, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1223,8 +1240,8 @@ img.file-preview {
 }
 
 .message.user .message-content {
-  background: rgba(180, 244, 101, 0.1);
-  border-color: rgba(180, 244, 101, 0.2);
+  background: rgba(194, 242, 121, 0.1);
+  border-color: rgba(194, 242, 121, 0.2);
 }
 
 .message-time {
@@ -1240,7 +1257,7 @@ img.file-preview {
 /* 消息内容中的 Markdown 元素补充样式 (基于已有的 .markdown-content) */
 .message-content h1, .message-content h2, .message-content h3 {
   margin: 15px 0 10px;
-  color: #4ade80;
+  color: #C2F279;
   border-bottom: 1px solid #333;
   padding-bottom: 5px;
 }
@@ -1271,13 +1288,13 @@ img.file-preview {
   background: #2a2a2a;
   padding: 2px 5px;
   border-radius: 4px;
-  color: #90ee90;
+  color: #C2F279;
   font-family: 'Consolas', monospace;
   font-size: 13px;
 }
 
 .message-content blockquote {
-  border-left: 3px solid #4ade80;
+  border-left: 3px solid #C2F279;
   padding-left: 12px;
   margin: 10px 0;
   color: #aaa;
@@ -1291,7 +1308,7 @@ img.file-preview {
 }
 
 .message-content a {
-  color: #4ade80;
+  color: #C2F279;
   text-decoration: none;
 }
 
@@ -1322,8 +1339,8 @@ img.file-preview {
   flex-shrink: 0;
   margin-top: auto;
   padding: 20px;
-  border-top: 1px solid #333333;
-  background: #1f1f1f;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
   position: relative;
   z-index: 2;
 }
@@ -1349,7 +1366,7 @@ img.file-preview {
   gap: 8px;
   padding: 6px 12px;
   background: #2a2a2a;
-  border: 1px solid #4ade80;
+  border: 1px solid #C2F279;
   border-radius: 6px;
   font-size: 12px;
   color: #fff;
@@ -1391,8 +1408,8 @@ img.file-preview {
 }
 
 .file-drop-zone.drag-over {
-  border-color: #4ade80;
-  background: rgba(74, 158, 255, 0.1);
+  border-color: #C2F279;
+  background: rgba(194, 242, 121, 0.1);
 }
 
 .input-wrapper {
@@ -1403,8 +1420,8 @@ img.file-preview {
 
 .chat-input {
   flex: 1;
-  background: #2a2a2a;
-  border: 1px solid #333333;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   padding: 12px 16px;
   color: #ffffff;
@@ -1417,11 +1434,11 @@ img.file-preview {
 }
 
 .chat-input:focus {
-  border-color: #4ade80;
+  border-color: #C2F279;
 }
 
 .send-btn {
-  background: #4ade80;
+  background: #C2F279;
   border: none;
   border-radius: 8px;
   width: 44px;
@@ -1430,12 +1447,12 @@ img.file-preview {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #ffffff;
+  color: #0d130f;
   transition: background 0.3s ease;
 }
 
 .send-btn:hover {
-  background: #3a8eef;
+  background: rgba(194, 242, 121, 0.8);
 }
 
 .template-btn {
@@ -1456,7 +1473,7 @@ img.file-preview {
 
 .template-btn:hover {
   background: #333333;
-  border-color: #4ade80;
+  border-color: #C2F279;
 }
 
 .template-icon {
@@ -1477,11 +1494,9 @@ img.file-preview {
   cursor: pointer;
   transition: all 0.2s ease;
   max-width: 100%;
-}
-
 .file-card:hover {
-  border-color: #4ade80;
-  background: #333;
+  border-color: #C2F279;
+}  background: #333;
 }
 
 .file-card-icon {
@@ -1540,7 +1555,7 @@ img.file-preview {
 
 .file-card-action:hover {
   background: #333;
-  color: #4ade80;
+  color: #C2F279;
 }
 
 .file-card-action svg {
@@ -1641,7 +1656,7 @@ img.file-preview {
 }
 
 .dialog-input:focus {
-  border-color: #d4a574;
+  border-color: #C2F279;
 }
 
 .dialog-input::placeholder {
@@ -1673,13 +1688,13 @@ img.file-preview {
 }
 
 .dialog-btn-primary {
-  background: linear-gradient(135deg, #d4a574 0%, #c49660 100%);
-  color: #1a1a1a;
+  background: #C2F279;
+  color: #0d130f;
   font-weight: 600;
 }
 
 .dialog-btn-primary:hover {
-  background: linear-gradient(135deg, #e0b584 0%, #d4a574 100%);
+  background: rgba(194, 242, 121, 0.8);
 }
 
 /* ================= PDF 查看器样式 ================= */
@@ -1713,14 +1728,14 @@ img.file-preview {
 }
 
 .file-drop-zone:hover {
-  border-color: #4ade80;
-  background: rgba(74, 222, 128, 0.05);
+  border-color: #C2F279;
+  background: rgba(194, 242, 121, 0.05);
 }
 
 .file-drop-zone.drag-over {
-  border-color: #4ade80;
-  background: rgba(74, 222, 128, 0.1);
-  box-shadow: 0 0 20px rgba(74, 222, 128, 0.2);
+  border-color: #C2F279;
+  background: rgba(194, 242, 121, 0.1);
+  box-shadow: 0 0 20px rgba(194, 242, 121, 0.2);
 }
 
 .file-drop-zone.drag-over::after {
@@ -1730,7 +1745,7 @@ img.file-preview {
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: 14px;
-  color: #4ade80;
+  color: #C2F279;
   font-weight: 500;
 }
 
@@ -1742,8 +1757,8 @@ img.file-preview {
 
 /* 中间面板拖拽效果 */
 .middle-panel.drag-over .display-area {
-  border: 3px dashed #4ade80;
-  background: rgba(74, 222, 128, 0.05);
+  border: 3px dashed #C2F279;
+  background: rgba(194, 242, 121, 0.05);
 }
 
 /* 拖拽遮罩层 */
@@ -1763,7 +1778,7 @@ img.file-preview {
 
 .drag-overlay-content {
   background: #2a2a2a;
-  border: 2px dashed #4ade80;
+  border: 2px dashed #C2F279;
   border-radius: 16px;
   padding: 40px 60px;
   text-align: center;
@@ -1819,14 +1834,14 @@ img.file-preview {
 }
 
 .file-drop-zone:hover {
-  border-color: #4ade80;
-  background: rgba(74, 222, 128, 0.05);
+  border-color: #C2F279;
+  background: rgba(194, 242, 121, 0.05);
 }
 
 .file-drop-zone.drag-over {
-  border-color: #4ade80;
-  background: rgba(74, 222, 128, 0.1);
-  box-shadow: 0 0 20px rgba(74, 222, 128, 0.2);
+  border-color: #C2F279;
+  background: rgba(194, 242, 121, 0.1);
+  box-shadow: 0 0 20px rgba(194, 242, 121, 0.2);
 }
 
 .file-drop-zone.drag-over::after {
@@ -1836,7 +1851,7 @@ img.file-preview {
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: 14px;
-  color: #4ade80;
+  color: #C2F279;
   font-weight: 500;
 }
 
@@ -1848,8 +1863,8 @@ img.file-preview {
 
 /* 中间面板拖拽效果 */
 .middle-panel.drag-over .display-area {
-  border: 3px dashed #4ade80;
-  background: rgba(74, 222, 128, 0.05);
+  border: 3px dashed #C2F279;
+  background: rgba(194, 242, 121, 0.05);
 }
 
 /* 拖拽遮罩层 */
@@ -1869,7 +1884,7 @@ img.file-preview {
 
 .drag-overlay-content {
   background: #2a2a2a;
-  border: 2px dashed #4ade80;
+  border: 2px dashed #C2F279;
   border-radius: 16px;
   padding: 40px 60px;
   text-align: center;
@@ -1913,6 +1928,7 @@ img.file-preview {
 
 .file-delete-btn:hover {
   filter: brightness(0) invert(1) sepia(100%) saturate(10000%) hue-rotate(0deg);
+  color: #C2F279;
 }
 
 /* Toast 通知样式 */
@@ -1942,7 +1958,7 @@ img.file-preview {
 }
 
 .main-toast.success {
-  border-left: 4px solid #4CAF50;
+  border-left: 4px solid #C2F279;
 }
 
 .main-toast.error {
@@ -1955,7 +1971,7 @@ img.file-preview {
 }
 
 .main-toast.success .toast-icon {
-  color: #4CAF50;
+  color: #C2F279;
 }
 
 .main-toast.error .toast-icon {
@@ -1993,9 +2009,9 @@ img.file-preview {
 }
 
 .folder-picker-item.selected {
-  background: rgba(74, 222, 128, 0.2);
-  color: #4ade80;
-  border-left: 3px solid #4ade80;
+  background: rgba(194, 242, 121, 0.2);
+  color: #C2F279;
+  border-left: 3px solid #C2F279;
 }
 
 .folder-picker-icon {
@@ -2055,20 +2071,21 @@ img.file-preview {
 }
 
 .note-editor-btn.active {
-  background: #4ade80;
-  color: #1a1a1a;
-  border-color: #4ade80;
+  background: #C2F279;
+  color: #0d130f;
+  border-color: #C2F279;
   font-weight: 600;
 }
 
 .note-save-btn {
-  background: #3b82f6;
-  border-color: #3b82f6;
-  color: #fff;
+  background: #C2F279;
+  border-color: #C2F279;
+  color: #0d130f;
+  font-weight: 600;
 }
 
 .note-save-btn:hover {
-  background: #2563eb;
+  background: rgba(194, 242, 121, 0.8);
 }
 
 .note-editor-body {
@@ -2101,8 +2118,8 @@ img.file-preview {
 /* ================= PDF 下载链接样式 ================= */
 .pdf-download-link {
   display: inline-block;
-  background: linear-gradient(135deg, #4CAF50, #45a049);
-  color: white !important;
+  background: #C2F279;
+  color: #0d130f !important;
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
@@ -2113,9 +2130,9 @@ img.file-preview {
 }
 
 .pdf-download-link:hover {
-  background: linear-gradient(135deg, #45a049, #3d8b40);
+  background: rgba(194, 242, 121, 0.8);
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 2px 4px rgba(194, 242, 121, 0.3);
 }
 
 .pdf-download-link.pdf-saved {
@@ -2129,8 +2146,8 @@ img.file-preview {
 /* ================= 论文下载按钮样式 ================= */
 .paper-download-btn {
   display: inline-block;
-  background: linear-gradient(135deg, #4CAF50, #45a049);
-  color: white;
+  background: #C2F279;
+  color: #0d130f;
   border: none;
   padding: 4px 12px;
   border-radius: 4px;
@@ -2142,9 +2159,9 @@ img.file-preview {
 }
 
 .paper-download-btn:hover {
-  background: linear-gradient(135deg, #45a049, #3d8b40);
+  background: rgba(194, 242, 121, 0.8);
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 2px 4px rgba(194, 242, 121, 0.3);
 }
 
 .paper-download-btn.downloading {
@@ -2164,8 +2181,8 @@ img.file-preview {
 /* ================= 插入笔记按钮样式 ================= */
 .insert-note-btn {
   display: inline-block;
-  background: linear-gradient(135deg, #4CAF50, #45a049);
-  color: white;
+  background: #C2F279;
+  color: #0d130f;
   border: none;
   padding: 4px 12px;
   border-radius: 4px;
@@ -2177,9 +2194,9 @@ img.file-preview {
 }
 
 .insert-note-btn:hover {
-  background: linear-gradient(135deg, #45a049, #3d8b40);
+  background: rgba(194, 242, 121, 0.8);
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 2px 4px rgba(194, 242, 121, 0.3);
 }
 
 .insert-note-btn:disabled {
@@ -2217,3 +2234,92 @@ img.file-preview {
     opacity: 0;
   }
 }
+/* ================= 应用内通知 ================= */
+.notification-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.in-app-notification {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(180, 244, 101, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  min-width: 300px;
+  max-width: 400px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.in-app-notification.hiding {
+  animation: slideOut 0.3s ease-out forwards;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+}
+
+.notification-icon {
+  font-size: 24px;
+}
+
+.notification-content {
+  flex: 1;
+}
+
+.notification-title {
+  color: #b4f465;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.notification-body {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.notification-close:hover {
+  color: #ffffff;
+}
+

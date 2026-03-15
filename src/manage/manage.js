@@ -303,13 +303,13 @@ function setupSearchInputs() {
 
 // 统计数据接口（占位）
 async function fetchStatistics() {
-  // TODO: 后续接入实际的计算逻辑
+  // 当没有打开文件夹或初始化时，默认所有统计为 0
   return {
-    totalItems: 68,
-    totalItemsChange: 12,
-    categoryCount: 4,
-    notesCount: 45,
-    imagesCount: 23
+    totalItems: 0,
+    totalItemsChange: 0,
+    categoryCount: 0,
+    notesCount: 0,
+    imagesCount: 0
   };
 }
 
@@ -537,6 +537,11 @@ let categories = [];
 // 获取分类数据（从工作区统计数据获取）
 async function fetchCategories() {
   try {
+    // 根据需求：页面初始时应该是空的，只有已在 main 打开文件夹的才有效
+    if (!sessionStorage.getItem('folderState')) {
+      return [];
+    }
+
     const result = await window.electronAPI.workspace.getStats();
     if (!result.success) {
       console.warn('获取工作区统计失败:', result.error);
@@ -723,9 +728,24 @@ async function fetchKnowledgeItems(categoryId) {
 // 更新概览页面统计信息
 async function updateOverviewStats() {
   try {
+    if (!sessionStorage.getItem('folderState')) {
+      document.getElementById('statTotalValue').textContent = 0;
+      document.getElementById('statCategoryValue').textContent = 0;
+      document.getElementById('statNotesValue').textContent = 0;
+      document.getElementById('statImagesValue').textContent = 0;
+      updateRecentItems([]);
+      return;
+    }
+
     const result = await window.electronAPI.workspace.getStats();
     if (!result.success) {
       console.warn('获取工作区统计失败:', result.error);
+      // 如果没有打开工作区，则重置为 0 并显示空状态
+      document.getElementById('statTotalValue').textContent = 0;
+      document.getElementById('statCategoryValue').textContent = 0;
+      document.getElementById('statNotesValue').textContent = 0;
+      document.getElementById('statImagesValue').textContent = 0;
+      updateRecentItems([]);
       return;
     }
 

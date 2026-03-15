@@ -1,0 +1,261 @@
+/* 
+  YanZhi - Motta Style (Version 3)
+  Complementary CSS for Dynamic Elements & Tailwind Integration
+*/
+
+/* --- Scrollbar Customization --- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* --- File Tree (Dynamic Elements) --- */
+.folder-item,
+.file-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #9ca3af; /* text-gray-400 */
+  border: 1px solid transparent;
+}
+
+.folder-item:hover,
+.file-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.folder-item.active,
+.file-item.active {
+  background-color: rgba(180, 244, 101, 0.1); /* bg-[#b4f465]/10 */
+  color: #b4f465; /* text-[#b4f465] */
+  border-color: rgba(180, 244, 101, 0.2);
+}
+
+.folder-name,
+.file-name {
+  margin-left: 8px;
+  font-size: 0.875rem; /* text-sm */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.folder-icon,
+.file-icon {
+  width: 18px;
+  height: 18px;
+  /* Ensure icons are visible on dark bg */
+  filter: none; 
+}
+
+.folder-arrow {
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+  opacity: 0.6;
+  transition: transform 0.2s;
+  filter: invert(1); /* Make black arrows white */
+}
+
+.folder-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.file-delete-btn {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.2s;
+  filter: invert(1);
+  cursor: pointer;
+}
+
+.file-item:hover .file-delete-btn {
+  opacity: 0.6;
+}
+
+.file-delete-btn:hover {
+  opacity: 1;
+}
+
+/* --- Chat Messages (Dynamic Elements) --- */
+.message {
+  display: flex;
+  flex-direction: column;
+  max-width: 90%;
+  margin-bottom: 16px;
+}
+
+.message.user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.message.assistant,
+.message.ai {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.message-content {
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  word-wrap: break-word;
+}
+
+.message.user .message-content {
+  background-color: #b4f465; /* Primary Green */
+  color: #052e16; /* Dark Green Text */
+  border-top-right-radius: 4px;
+  font-weight: 500;
+}
+
+.message.assistant .message-content,
+.message.ai .message-content {
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #d1d5db; /* text-gray-300 */
+  border-top-left-radius: 4px;
+}
+
+/* Markdown Styles inside Message Content */
+.message-content h1,
+.message-content h2,
+.message-content h3 {
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  color: inherit;
+}
+
+.message-content p {
+  margin-bottom: 0.5em;
+}
+
+.message-content ul,
+.message-content ol {
+  padding-left: 1.5em;
+  margin-bottom: 0.5em;
+  list-style-type: disc;
+}
+
+.message-content code {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.85em;
+}
+
+.message.user .message-content code {
+  background-color: rgba(255, 255, 255, 0.3);
+  color: #000;
+}
+
+.message-content pre {
+  background-color: rgba(0, 0, 0, 0.3);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin-bottom: 0.5em;
+}
+
+.message-content a {
+  text-decoration: underline;
+  color: inherit;
+}
+
+/* --- Attachments --- */
+.attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: #e5e7eb;
+}
+
+.attachment-remove {
+  cursor: pointer;
+  font-weight: bold;
+  opacity: 0.6;
+}
+
+.attachment-remove:hover {
+  opacity: 1;
+}
+
+/* --- Collapsed State Logic (Handled via JS mostly, but adding CSS overrides) --- */
+.left-panel.collapsed {
+  width: 80px !important;
+  min-width: 80px;
+  padding: 24px 12px;
+}
+
+.right-panel.collapsed {
+  width: 80px !important;
+  min-width: 80px;
+  padding: 24px 12px;
+}
+
+/* Hide elements in collapsed state */
+.left-panel.collapsed .panel-header h2,
+.left-panel.collapsed .search-container,
+.left-panel.collapsed .folder-status,
+.left-panel.collapsed .folder-name,
+.left-panel.collapsed .file-name,
+.left-panel.collapsed .folder-arrow,
+.left-panel.collapsed .action-buttons span {
+  display: none !important;
+}
+
+.left-panel.collapsed .action-buttons {
+  flex-direction: column;
+}
+
+.left-panel.collapsed .action-btn,
+.left-panel.collapsed #newFolderBtn {
+  width: 100%;
+  padding: 0;
+  justify-content: center;
+}
+
+.right-panel.collapsed .panel-header h2,
+.right-panel.collapsed .chat-messages,
+.right-panel.collapsed .chat-input-container {
+  display: none !important;
+}
+
+/* Markdown Content in Display Area */
+.markdown-content {
+  color: #e5e7eb;
+  line-height: 1.7;
+}
+
+.markdown-content h1 { font-size: 2em; font-weight: bold; margin-bottom: 0.5em; color: #fff; }
+.markdown-content h2 { font-size: 1.5em; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; color: #fff; }
+.markdown-content p { margin-bottom: 1em; }
+.markdown-content ul { list-style: disc; padding-left: 1.5em; margin-bottom: 1em; }
+.markdown-content blockquote { border-left: 4px solid #b4f465; padding-left: 1em; color: #9ca3af; margin-bottom: 1em; }
