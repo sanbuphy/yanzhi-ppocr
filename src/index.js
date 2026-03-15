@@ -953,18 +953,17 @@ ipcMain.handle('arxiv:search', async (event, query, maxResults = 5) => {
 // 下载 PDF 到临时文件夹
 ipcMain.handle('arxiv:download', async (event, pdfUrl, title) => {
   return new Promise(async (resolve) => {
-    const toolsDir = path.join(__dirname, '..', 'tools');
-    const pdfsDir = path.join(toolsDir, 'pdfs');
+    const tempDir = path.join(__dirname, '..', 'temp');
     
-    // 确保 pdfs 文件夹存在
-    if (!fs.existsSync(pdfsDir)) {
-      fs.mkdirSync(pdfsDir, { recursive: true });
+    // 确保 temp 文件夹存在
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
     }
     
     // 清理文件名
     const safeTitle = title.replace(/[<>:"/\\|?*]/g, '_').substring(0, 100);
     const filename = `${safeTitle}.pdf`;
-    const filePath = path.join(pdfsDir, filename);
+    const filePath = path.join(tempDir, filename);
     
     console.log('[Arxiv] 下载 PDF:', pdfUrl);
     console.log('[Arxiv] 保存到:', filePath);
@@ -1065,6 +1064,15 @@ ipcMain.handle('arxiv:saveToFolder', async (event, pdfPath, description) => {
 
     // 复制文件到目标路径
     fs.copyFileSync(pdfPath, classifyResult.savePath);
+
+    // 清理临时文件
+    try {
+      if (fs.existsSync(pdfPath)) {
+        fs.unlinkSync(pdfPath);
+      }
+    } catch (cleanupError) {
+      console.warn('[SavePDF] 临时文件清理失败:', cleanupError.message || cleanupError);
+    }
 
     // 保存元数据 Sidecar
     metadataManager.saveMetadata(classifyResult.savePath, meta);
