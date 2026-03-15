@@ -324,9 +324,9 @@ ${foldersInfo}
      * @returns {string} 完整保存路径
      */
     _buildSavePath(targetFolder, fileType, isBlog, fileName) {
-        // 图片类型：保存到目标文件夹下的 "图片" 子文件夹
+        // 图片类型：保存到目标文件夹下的 "images" 子文件夹
         if (fileType === 'image') {
-            const imageFolder = path.join(targetFolder, '图片');
+            const imageFolder = path.join(targetFolder, 'images');
             const baseName = fileName ? path.basename(fileName) : `image_${Date.now()}.png`;
             return {
                 targetFolder: imageFolder,
@@ -354,9 +354,10 @@ ${foldersInfo}
             };
         }
 
-        // 文本类型：保存为 note.md
+        // 文本类型：保存到当前文件夹根目录，文件名为 {FolderName}.md
         if (fileType === 'text') {
-            const baseName = fileName ? path.basename(fileName, path.extname(fileName)) + '.md' : 'note.md';
+            const folderName = path.basename(targetFolder);
+            const baseName = fileName ? path.basename(fileName, path.extname(fileName)) + '.md' : `${folderName}.md`;
             return {
                 targetFolder: targetFolder,
                 savePath: path.join(targetFolder, baseName)
@@ -439,12 +440,34 @@ ${foldersInfo}
             // 查找匹配的文件夹
             const matchedFolder = folderConfig.folders.find(f => f.name === selection.folder_name);
 
-            // 如果没找到匹配，使用第一个文件夹或返回错误
+            // 如果没找到匹配，自动归属到“其他”文件夹
             const targetFolderName = matchedFolder
                 ? selection.folder_name
-                : (folderConfig.folders[0]?.name || '其他');
+                : '其他';
 
-            const targetFolder = matchedFolder?.path || path.join(workspace.workspacePath, targetFolderName);
+            let targetFolder = matchedFolder?.path;
+            
+            // 如果未找到匹配的文件夹路径，则构建“其他”文件夹路径
+            if (!targetFolder) {
+                targetFolder = path.join(workspace.workspacePath, targetFolderName);
+                // 确保“其他”文件夹存在
+                if (!fs.existsSync(targetFolder)) {
+                    try {
+                        fs.mkdirSync(targetFolder, { recursive: true });
+                        
+                        // 同时创建子文件夹
+                        const subFolders = ['images', '博客', '文章'];
+                        subFolders.forEach(sub => {
+                            const subPath = path.join(targetFolder, sub);
+                            if (!fs.existsSync(subPath)) {
+                                fs.mkdirSync(subPath, { recursive: true });
+                            }
+                        });
+                    } catch (e) {
+                        console.warn(`自动创建文件夹失败: ${targetFolder}`, e);
+                    }
+                }
+            }
 
             // 构建保存路径
             const pathInfo = this._buildSavePath(targetFolder, fileType, isBlog, fileName);

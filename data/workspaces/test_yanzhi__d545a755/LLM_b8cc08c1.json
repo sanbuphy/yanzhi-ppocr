@@ -2,7 +2,7 @@
   "folderName": "LLM",
   "path": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM",
   "workspaceId": "test_yanzhi__d545a755",
-  "scanTime": "2026-03-14T04:30:42.995Z",
+  "scanTime": "2026-03-15T02:02:50.912Z",
   "files": [
     {
       "name": "LLM.md",
@@ -54,6 +54,30 @@
       "type": "folder",
       "path": "文章",
       "files": [
+        {
+          "name": "RETA-LLM_ A Retrieval-Augmented Large Language Model Toolkit.pdf",
+          "type": "file",
+          "path": "文章/RETA-LLM_ A Retrieval-Augmented Large Language Model Toolkit.pdf",
+          "format": "pdf",
+          "addedTime": "2026-03-15T01:23:52.356Z",
+          "modifiedTime": "2026-03-15T01:23:52.155Z",
+          "size": 422225,
+          "meta": {
+            "title": "RETA-LLM: A Retrieval-Augmented Large Language Model Toolkit",
+            "authors": "Jiongnan Liu, Jiajie Jin, Zihan Wang, Jiehan Cheng, Zhicheng Dou, Ji-Rong Wen",
+            "arxivId": "2306.05212v1",
+            "published": "2023-06-08T14:10:54Z",
+            "url": "https://arxiv.org/abs/2306.05212v1",
+            "pdfUrl": "https://arxiv.org/pdf/2306.05212v1",
+            "abstract": "Although Large Language Models (LLMs) have demonstrated extraordinary capabilities in many domains, they still have a tendency to hallucinate and generate fictitious responses to user requests. This problem can be alleviated by augmenting LLMs with information retrieval (IR) systems (also known as retrieval-augmented LLMs). Applying this strategy, LLMs can generate more factual texts in response to user input according to the relevant content retrieved by IR systems from external corpora as references. In addition, by incorporating external knowledge, retrieval-augmented LLMs can answer in-domain questions that cannot be answered by solely relying on the world knowledge stored in parameters. To support research in this area and facilitate the development of retrieval-augmented LLM systems, we develop RETA-LLM, a {RET}reival-{A}ugmented LLM toolkit. In RETA-LLM, we create a complete pipeline to help researchers and users build their customized in-domain LLM-based systems. Compared with previous retrieval-augmented LLM systems, RETA-LLM provides more plug-and-play modules to support better interaction between IR systems and LLMs, including {request rewriting, document retrieval, passage extraction, answer generation, and fact checking} modules. Our toolkit is publicly available at https://github.com/RUC-GSAI/YuLan-IR/tree/main/RETA-LLM.",
+            "linkedAt": "2026-03-15T01:23:52.359Z",
+            "localPath": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\文章\\RETA-LLM_ A Retrieval-Augmented Large Language Model Toolkit.pdf"
+          },
+          "arxivId": "2306.05212v1",
+          "sourceUrl": "https://arxiv.org/pdf/2306.05212v1",
+          "authors": "Jiongnan Liu, Jiajie Jin, Zihan Wang, Jiehan Cheng, Zhicheng Dou, Ji-Rong Wen",
+          "abstract": "Although Large Language Models (LLMs) have demonstrated extraordinary capabilities in many domains, they still have a tendency to hallucinate and generate fictitious responses to user requests. This problem can be alleviated by augmenting LLMs with information retrieval (IR) systems (also known as retrieval-augmented LLMs). Applying this strategy, LLMs can generate more factual texts in response to user input according to the relevant content retrieved by IR systems from external corpora as references. In addition, by incorporating external knowledge, retrieval-augmented LLMs can answer in-domain questions that cannot be answered by solely relying on the world knowledge stored in parameters. To support research in this area and facilitate the development of retrieval-augmented LLM systems, we develop RETA-LLM, a {RET}reival-{A}ugmented LLM toolkit. In RETA-LLM, we create a complete pipeline to help researchers and users build their customized in-domain LLM-based systems. Compared with previous retrieval-augmented LLM systems, RETA-LLM provides more plug-and-play modules to support better interaction between IR systems and LLMs, including {request rewriting, document retrieval, passage extraction, answer generation, and fact checking} modules. Our toolkit is publicly available at https://github.com/RUC-GSAI/YuLan-IR/tree/main/RETA-LLM."
+        },
         {
           "name": "Think Before You Lie_ How Reasoning Improves Honesty.pdf",
           "type": "file",
@@ -115,8 +139,8 @@
       "children": []
     }
   ],
-  "totalFileCount": 6,
-  "fileCount": 6,
+  "totalFileCount": 7,
+  "fileCount": 7,
   "allFiles": [
     {
       "name": "LLM.md",
@@ -144,6 +168,30 @@
       "addedTime": "2026-01-07T14:43:06.871Z",
       "modifiedTime": "2026-01-07T14:43:06.875Z",
       "size": 6085691
+    },
+    {
+      "name": "RETA-LLM_ A Retrieval-Augmented Large Language Model Toolkit.pdf",
+      "type": "file",
+      "path": "文章/RETA-LLM_ A Retrieval-Augmented Large Language Model Toolkit.pdf",
+      "format": "pdf",
+      "addedTime": "2026-03-15T01:23:52.356Z",
+      "modifiedTime": "2026-03-15T01:23:52.155Z",
+      "size": 422225,
+      "meta": {
+        "title": "RETA-LLM: A Retrieval-Augmented Large Language Model Toolkit",
+        "authors": "Jiongnan Liu, Jiajie Jin, Zihan Wang, Jiehan Cheng, Zhicheng Dou, Ji-Rong Wen",
+        "arxivId": "2306.05212v1",
+        "published": "2023-06-08T14:10:54Z",
+        "url": "https://arxiv.org/abs/2306.05212v1",
+        "pdfUrl": "https://arxiv.org/pdf/2306.05212v1",
+        "abstract": "Although Large Language Models (LLMs) have demonstrated extraordinary capabilities in many domains, they still have a tendency to hallucinate and generate fictitious responses to user requests. This problem can be alleviated by augmenting LLMs with information retrieval (IR) systems (also known as retrieval-augmented LLMs). Applying this strategy, LLMs can generate more factual texts in response to user input according to the relevant content retrieved by IR systems from external corpora as references. In addition, by incorporating external knowledge, retrieval-augmented LLMs can answer in-domain questions that cannot be answered by solely relying on the world knowledge stored in parameters. To support research in this area and facilitate the development of retrieval-augmented LLM systems, we develop RETA-LLM, a {RET}reival-{A}ugmented LLM toolkit. In RETA-LLM, we create a complete pipeline to help researchers and users build their customized in-domain LLM-based systems. Compared with previous retrieval-augmented LLM systems, RETA-LLM provides more plug-and-play modules to support better interaction between IR systems and LLMs, including {request rewriting, document retrieval, passage extraction, answer generation, and fact checking} modules. Our toolkit is publicly available at https://github.com/RUC-GSAI/YuLan-IR/tree/main/RETA-LLM.",
+        "linkedAt": "2026-03-15T01:23:52.359Z",
+        "localPath": "C:\\Users\\32665\\Desktop\\test_yanzhi\\LLM\\文章\\RETA-LLM_ A Retrieval-Augmented Large Language Model Toolkit.pdf"
+      },
+      "arxivId": "2306.05212v1",
+      "sourceUrl": "https://arxiv.org/pdf/2306.05212v1",
+      "authors": "Jiongnan Liu, Jiajie Jin, Zihan Wang, Jiehan Cheng, Zhicheng Dou, Ji-Rong Wen",
+      "abstract": "Although Large Language Models (LLMs) have demonstrated extraordinary capabilities in many domains, they still have a tendency to hallucinate and generate fictitious responses to user requests. This problem can be alleviated by augmenting LLMs with information retrieval (IR) systems (also known as retrieval-augmented LLMs). Applying this strategy, LLMs can generate more factual texts in response to user input according to the relevant content retrieved by IR systems from external corpora as references. In addition, by incorporating external knowledge, retrieval-augmented LLMs can answer in-domain questions that cannot be answered by solely relying on the world knowledge stored in parameters. To support research in this area and facilitate the development of retrieval-augmented LLM systems, we develop RETA-LLM, a {RET}reival-{A}ugmented LLM toolkit. In RETA-LLM, we create a complete pipeline to help researchers and users build their customized in-domain LLM-based systems. Compared with previous retrieval-augmented LLM systems, RETA-LLM provides more plug-and-play modules to support better interaction between IR systems and LLMs, including {request rewriting, document retrieval, passage extraction, answer generation, and fact checking} modules. Our toolkit is publicly available at https://github.com/RUC-GSAI/YuLan-IR/tree/main/RETA-LLM."
     },
     {
       "name": "Think Before You Lie_ How Reasoning Improves Honesty.pdf",

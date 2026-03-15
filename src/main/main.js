@@ -554,6 +554,27 @@ async function createSubFolder() {
     if (result.success) {
       console.log('文件夹创建成功:', result.path);
 
+      // 确保默认 Markdown 文件存在（双重保障）
+      try {
+        const mdFileName = `${folderName.trim()}.md`;
+        // 读取新文件夹内容检查
+        const readResult = await window.electronAPI.folder.read(result.path);
+        if (readResult.success) {
+          const hasMdFile = readResult.items.some(item => item.name === mdFileName);
+          if (!hasMdFile) {
+            console.log('默认Markdown文件未找到，尝试手动创建...');
+            // 猜测路径分隔符
+            const sep = result.path.includes('\\') ? '\\' : '/';
+            const mdPath = `${result.path}${sep}${mdFileName}`;
+            const mdContent = `# ${folderName.trim()}\n\n在这里记录关于 ${folderName.trim()} 的笔记...`;
+            await window.electronAPI.file.write(mdPath, mdContent);
+            console.log('手动创建默认Markdown文件成功');
+          }
+        }
+      } catch (e) {
+        console.error('检查默认Markdown文件失败:', e);
+      }
+
       // 重新激活工作区以更新统计数据
       if (window.electronAPI.workspace?.setActive) {
         console.log('重新激活工作区以更新统计...');
@@ -1511,73 +1532,11 @@ function setupEventListeners() {
   const newCustomTemplateOption = document.getElementById('newCustomTemplateOption');
   
   if (newFolderBtn && newDropdown) {
-    // 更新下拉菜单位置的函数
-    const updateDropdownPosition = () => {
-      const rect = newFolderBtn.getBoundingClientRect();
-      newDropdown.style.left = rect.left + 'px';
-      newDropdown.style.top = (rect.bottom + 5) + 'px';
-      newDropdown.style.width = rect.width + 'px';
-    };
-    
     // 点击新建按钮显示/隐藏下拉菜单
     newFolderBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const isShowing = newDropdown.classList.contains('show');
-      if (!isShowing) {
-        updateDropdownPosition();
-      }
       newDropdown.classList.toggle('show');
     });
-    
-    // 窗口大小改变时更新位置
-    window.addEventListener('resize', () => {
-      if (newDropdown.classList.contains('show')) {
-        updateDropdownPosition();
-      }
-    });
-    
-    // 处理二级菜单的显示位置
-    if (newNoteOption) {
-      const submenu = newNoteOption.querySelector('.submenu');
-      if (submenu) {
-        // 更新二级菜单位置的函数
-        const updateSubmenuPosition = () => {
-          const rect = newNoteOption.getBoundingClientRect();
-          const viewportWidth = window.innerWidth;
-          
-          // 计算二级菜单的位置，紧贴主菜单（无间隙）
-          // rect.right 是主菜单项的右边缘，直接使用这个值作为二级菜单的 left
-          let left = rect.right;
-          // rect.top 是主菜单项的上边缘，直接使用这个值作为二级菜单的 top
-          let top = rect.top;
-          
-          // 如果右侧空间不够，显示在左侧
-          if (left + 180 > viewportWidth) {
-            left = rect.left - 180; // 180px宽度，无间距
-          }
-          
-          // 强制设置为 fixed 定位，相对于视口
-          submenu.style.position = 'fixed';
-          submenu.style.left = left + 'px';
-          submenu.style.top = top + 'px';
-          submenu.style.marginLeft = '0'; // 确保没有额外的 margin
-          submenu.style.marginTop = '0'; // 确保没有额外的 margin
-        };
-        
-        // 鼠标进入主菜单项时更新位置
-        newNoteOption.addEventListener('mouseenter', updateSubmenuPosition);
-        
-        // 鼠标进入二级菜单时也更新位置（防止位置偏移）
-        submenu.addEventListener('mouseenter', updateSubmenuPosition);
-        
-        // 窗口大小改变时更新位置
-        window.addEventListener('resize', () => {
-          if (submenu.style.display !== 'none') {
-            updateSubmenuPosition();
-          }
-        });
-      }
-    }
     
     // 点击新建文件夹选项
     if (newFolderOption) {
