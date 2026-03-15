@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onWorkspaceUpdated: (callback) => {
       ipcRenderer.on('workspace:updated', (event, data) => callback(data));
     },
+    generateKnowledgeMap: (folderPath) => ipcRenderer.invoke('workspace:generateMap', folderPath)
   },
   
   // 文件操作

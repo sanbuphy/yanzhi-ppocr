@@ -1523,6 +1523,51 @@ function setupEventListeners() {
     });
   }
   
+  // 生成知识脉络图按钮
+  const btnGenerateMap = document.getElementById('btnGenerateMap');
+  if (btnGenerateMap) {
+      btnGenerateMap.addEventListener('click', async () => {
+          let targetFolder = currentFolderPath;
+          
+          if (!targetFolder) {
+              const stateStr = sessionStorage.getItem('folderState');
+              if (stateStr) {
+                  try {
+                      const state = JSON.parse(stateStr);
+                      targetFolder = state.folderPath;
+                  } catch (e) {}
+              }
+          }
+          
+          if (!targetFolder) {
+              showMainToast('请先打开或选择一个工作区文件夹！');
+              return;
+          }
+
+          const originalText = btnGenerateMap.innerHTML;
+          btnGenerateMap.innerHTML = '<span style="font-size: 13px;">⏳ 生成中...</span>';
+          btnGenerateMap.disabled = true;
+
+          try {
+              const result = await window.electronAPI.workspace.generateKnowledgeMap(targetFolder);
+              
+              if (result.success) {
+                  showMainToast('✨ 知识脉络图生成成功！已保存到该文件夹。');
+                  // 刷新文件树
+                  await renderFileTree(); 
+              } else {
+                    showMainToast(`❌ 生成失败：${result.error}`, "error");
+              }
+          } catch (err) {
+              console.error("生成报错: ", err);
+                showMainToast(`❌ 发生错误：${err.message}`, "error");
+          } finally {
+              btnGenerateMap.innerHTML = originalText;
+              btnGenerateMap.disabled = false;
+          }
+      });
+  }
+  
   // 新建按钮和下拉菜单
   const newFolderBtn = document.getElementById('newFolderBtn');
   const newDropdown = document.getElementById('newDropdown');

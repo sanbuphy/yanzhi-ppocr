@@ -10,6 +10,7 @@ app.disableHardwareAcceleration();
 
 // 引入原生 AI 服务模块
 const { askAI, readPdf, searchArxiv, downloadArxivPdf } = require('./utils/AIProvider');
+const { getAIClient } = require('./screenshot/aiClient');
 
 // 引入 Agent 智能处理模块
 const { processInstruction, getAgent, initAgent } = require('./agent');
@@ -502,6 +503,136 @@ ipcMain.handle('workspace:getCategoryDetail', async (event, categoryName) => {
   } catch (err) {
     console.error('[Workspace] 获取分类详情失败:', err);
     return { success: false, error: err.message };
+  }
+});
+
+// 生成知识脉络图
+ipcMain.handle('workspace:generateMap', async (event, folderPath) => {
+  try {
+      console.log(`[KnowledgeMap] 开始为目录生成基于子文件夹的脉络图: ${folderPath}`);
+      const aiClient = getAIClient('你是一个专业的学术与知识整理助手。');
+
+      // 递归获取支持的文件
+      const getTargetFiles = (dir) => {
+        let results = [];
+        if (!fs.existsSync(dir)) return results;
+        const list = fs.readdirSync(dir);
+        for (const file of list) {
+          const fullPath = path.join(dir, file);
+          const stat = fs.statSync(fullPath);
+          if (stat.isDirectory()) {
+            results = results.concat(getTargetFiles(fullPath));
+          } else {
+            const ext = path.extname(fullPath).toLowerCase();
+            if (['.md', '.txt', '.pdf', '.png', '.jpg', '.jpeg', '.webp'].includes(ext) && !file.startsWith('_Knowledge_Map')) {
+              results.push(fullPath);
+            }
+          }
+        }
+        return results;
+      };
+
+      // 提取提纲的复用方法
+      const processSingleFile = async (filePath) => {
+        let content = '';
+        const ext = path.extname(filePath).toLowerCase();
+        try {
+            if (['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
+              console.log(`[KnowledgeMap] 正在使用图片多模态分析: ${path.basename(filePath)}...`);
+              const base64Data = fs.readFileSync(filePath).toString('base64');
+              const dataUrl = `data:image/${ext.replace('.', '')};base64,${base64Data}`;
+              const summary = await aiClient.ask("请用一两句话极其客观地概括这张图片和图表的核心有效内容，不准进行无关的个人发散或编造。", dataUrl, 0.5, 300);
+              return `【图片文件：${path.basename(filePath)}】：${summary}`;
+            }
+
+            if (ext === '.pdf') {
+              const pdfResult = await readPdf(filePath, 3);
+              if (pdfResult.success) content = pdfResult.content;
+            } else {
+              content = fs.readFileSync(filePath, 'utf-8');
+            }
+            
+            if (content && content.trim()) {
+                const truncatedCmd = content.substring(0, 2000);
+                const filePrompt = `你是一个严谨的信息提取助手。现有一份文档，请用一两句话简要概括其核心内容。强烈要求：必须完全按照文档的实际内容输出，绝对不允许凭空捏造、瞎编任何原文不存在的信息！\n\n文档内容：\n${truncatedCmd}`;
+                const fileSummary = await aiClient.ask(filePrompt, null, 0.5, 300);
+                return `【文件：${path.basename(filePath)}】：${fileSummary}`;
+            }
+            return `【文件：${path.basename(filePath)}】：无有效文本内容可以提取`;
+        } catch (err) {
+          return `【文件：${path.basename(filePath)}】：内容提取失败（${err.message}）`;
+        }
+      };
+
+      const topLevelItems = fs.readdirSync(folderPath);
+      const rootSummaries = []; // 存放所有子版块及根目录下文件的最终总结
+
+      // 以每个一级子文件夹为一个处理单位
+      for (const item of topLevelItems) {
+        if (item.startsWith('.')) continue; // 忽略隐藏文件夹如.git
+        const itemPath = path.join(folderPath, item);
+        const stat = fs.statSync(itemPath);
+
+        if (stat.isDirectory()) {
+          console.log(`[KnowledgeMap] 开始处理子文件夹区块: ${item}`);
+          const subFiles = getTargetFiles(itemPath);
+          if (subFiles.length === 0) continue;
+
+          const subSummaries = [];
+          for (const subFile of subFiles) {
+            const sum = await processSingleFile(subFile);
+            if (sum) subSummaries.push(sum);
+          }
+
+          const subText = subSummaries.join('\n\n');
+            const promptSub = `你是一个严谨的学术整理助手。请根据以下各个文件的真实简介，仅仅梳理出【${item}】文件夹下的客观引导目录(Index)。
+基本要求：
+1. 你的总结必须百分之百基于提供的文本内容！绝对不允许产生幻觉或编造任何不存在的关联、作者或内容！
+2. 请简要介绍这个子文件夹的整体定位，并重点以列表形式列出各个文件大概讲述了什么客观内容。
+3. 不需要长篇大论的详细解释，重点是真实的导航和索引。输出格式必须为结构化 Markdown。
+4. 【重要】：当你在正文或列表中提到具体的「原文件名称」时，必须使用加粗语法（如 **文件名.pdf** ）或反引号（如 \`文件名.pdf\` ）进行显眼的特殊标记，方便用户快速识别。
+
+内容如下：\n${subText}`;
+          const subMapContent = await aiClient.ask(promptSub, null, 0.6, 1500);
+
+          // 保存子文件夹的 md
+          fs.writeFileSync(path.join(itemPath, `_Knowledge_Map_${item}.md`), subMapContent, 'utf-8');
+          rootSummaries.push(`\n### 版块：【${item}】的内容脉络\n${subMapContent}\n`);
+          
+        } else {
+          // 位于根目录的平铺文件
+          const ext = path.extname(item).toLowerCase();
+          if (['.md', '.txt', '.pdf', '.png', '.jpg', '.jpeg', '.webp'].includes(ext) && !item.startsWith('_Knowledge_Map')) {
+             const singleSum = await processSingleFile(itemPath);
+             if (singleSum) rootSummaries.push(`\n### 独立文件：【${item}】\n${singleSum}\n`);
+          }
+        }
+      }
+
+      if (rootSummaries.length === 0) {
+        return { success: false, error: '未找到任何支持扫描的文件' };
+      }
+
+      console.log(`[KnowledgeMap] 所有版块处理完成，开始生成全局脉络大图...`);
+      const allText = rootSummaries.join('\n\n=====\n\n');
+const promptFinal = `你是一个非常严谨的学术整理助手。请紧密且完全依赖以下各个子版块的引导目录内容，生成整个主文件夹的全局导引索引(Global Index)。
+基本要求：
+1. 【红线警告】：绝对不允许自己编造、发散或产生任何原文中没有覆盖的幻觉信息！！！所有的梳理必须建立在给定的数据之上。
+2. 说明各个子版块主要涵盖了什么内容和它们之间的客观宏观逻辑关联，帮助用户能快速了解该工作区的真实知识结构。
+3. 输出格式必须为结构化 Markdown。
+4. 【重要】：当你在正文或列表中提到具体的「原文件名称」时，必须使用加粗语法（如 **文件名** ）或反引号（如 \`文件名\` ）进行显眼的特殊标记，以便用户阅读！
+
+各个区块真实输入数据如下：\n${allText}`;
+
+        const finalMapContent = await aiClient.ask(promptFinal, null, 0.6, 2500);
+        const outputFilePath = path.join(folderPath, '_Knowledge_Map.md');
+        fs.writeFileSync(outputFilePath, finalMapContent, 'utf-8');
+        console.log(`[KnowledgeMap] 全局知识脉络图生成成功: ${outputFilePath}`);
+
+        return { success: true, mapFilePath: outputFilePath };
+  } catch (e) {
+    console.error('[KnowledgeMap] 生成过程中抛出错误:', e);
+    return { success: false, error: e.message };
   }
 });
 
