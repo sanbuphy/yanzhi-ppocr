@@ -947,6 +947,23 @@ async function renderKnowledgeItems(categoryId) {
     
     console.log('知识条目已渲染，数量:', itemsList.children.length);
     
+    // 绑定卡片点击事件（整体点击跳转）
+    document.querySelectorAll('.knowledge-item-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        // 如果点击的是按钮或操作图标，不触发整体跳转
+        if (e.target.closest('.knowledge-item-btn') || e.target.closest('.knowledge-item-action-icon')) {
+          return;
+        }
+        
+        const itemId = card.getAttribute('data-id');
+        const filePath = card.getAttribute('data-filepath');
+        const fileName = card.getAttribute('data-filename');
+        const fileType = card.getAttribute('data-type');
+        
+        handleKnowledgeItemAction('view-detail', itemId, filePath, fileName, fileType);
+      });
+    });
+    
     // 绑定按钮事件
     document.querySelectorAll('.knowledge-item-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
