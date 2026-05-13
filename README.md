@@ -119,12 +119,23 @@ npm start
 
 ### 2. PaddleOCR.js 配置
 
+当前 OCR 使用官方浏览器推理 SDK `@paddleocr/paddleocr-js@0.3.2`，模型版本为 `PP-OCRv5`：
+
+- 检测模型：`PP-OCRv5_mobile_det`
+- 识别模型：`PP-OCRv5_mobile_rec`
+- 默认语言：`ch`
+- 默认推理后端：`auto`，测试脚本固定使用 `wasm`
+- 运行方式：Electron 主进程注册 `ppocrjs://local` 本地协议，在隐藏 BrowserWindow 中注入 PaddleOCR.js bundle，模型与 ORT wasm 均从本地缓存读取，不调用 PaddleOCR-VL 或 Python OCR。
+
 可选环境变量：
 
 ```bash
 PADDLEOCR_LANG=ch
 PADDLEOCR_VERSION=PP-OCRv5
 PADDLEOCR_BACKEND=auto
+PADDLEOCR_MODEL_DIR=src/screenshot/vendor/paddleocr-js-models
+PADDLEOCR_DET_MODEL_NAME=PP-OCRv5_mobile_det
+PADDLEOCR_REC_MODEL_NAME=PP-OCRv5_mobile_rec
 ```
 
 首次安装依赖后先生成浏览器 SDK bundle，并缓存官方 PP-OCRv5 模型到本地：
@@ -133,6 +144,18 @@ PADDLEOCR_BACKEND=auto
 npm run build:paddleocr-js
 npm run download:paddleocr-js-models
 ```
+
+本地 OCR 调用入口：
+
+- 应用内截图识别：`src/screenshot/aiClient.js` 创建 `PaddleOcrJsClient`，调用 `recognize(imagePath)` 后把 OCR 文本拼入 Qwen 提示词。
+- PaddleOCR.js 封装：`src/screenshot/PaddleOcrJsClient.js` 负责注册本地协议、加载 SDK bundle、加载本地模型、执行 `PaddleOCR.create()` 和 `ocr.predict()`。
+- 独立验证命令：
+
+```bash
+npm run test:paddleocr-js
+```
+
+验证通过时会输出 `ok: true`，并返回识别文本、置信度、耗时指标和实际运行后端。
 
 ### 3. 浏览器配置 (Edge)
 
