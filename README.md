@@ -81,11 +81,11 @@ AI 辅助科研知识体系助手
 - **Node.js & npm**：用于运行 Electron 客户端
 - **主要 npm 依赖**：
   - `electron`：桌面应用程序框架
-  - `openai`：与大模型（如 Qwen、DeepSeek）交互
+  - `openai`：与大模型（如 Qwen）交互
   - `puppeteer-core`：驱动浏览器生成 PDF 或抓取网页
   - `pdf-parse`：解析 PDF 文档
   - `koffi`：Node.js FFI 能力
-  - `tesseract.js`：本地 OCR 识别
+  - `@paddleocr/paddleocr-js`：浏览器端本地 OCR 推理
 
 ## 📦 快速开始
 
@@ -112,19 +112,36 @@ npm start
 
 ### 1. API 配置
 
-本软件默认使用硅基流动（SiliconCloud）提供的 **DeepSeek OCR + Qwen2.5 7B** 模型。
+本软件默认使用 **本地 PaddleOCR.js + 硅基流动（SiliconCloud）Qwen2.5 7B**：PaddleOCR.js 在 Electron 浏览器上下文内运行 PP-OCRv5 识别截图文字，Qwen 负责后续图像内容解读和整理。
 
 - 前往 [硅基流动官网](https://cloud.siliconflow.cn/) 注册并申请 API Key
 - 将申请到的 Key 填入 [data/token.env](data/token.env)（将 txt 后缀改为 env）
 
-### 2. 浏览器配置 (Edge)
+### 2. PaddleOCR.js 配置
+
+可选环境变量：
+
+```bash
+PADDLEOCR_LANG=ch
+PADDLEOCR_VERSION=PP-OCRv5
+PADDLEOCR_BACKEND=auto
+```
+
+首次安装依赖后先生成浏览器 SDK bundle，并缓存官方 PP-OCRv5 模型到本地：
+
+```bash
+npm run build:paddleocr-js
+npm run download:paddleocr-js-models
+```
+
+### 3. 浏览器配置 (Edge)
 
 程序需要通过远程调试端口操作浏览器以生成 PDF 或抓取内容。
 
 - 右键 Edge 桌面快捷方式，选择“属性”
 - 在“目标”栏末尾添加 `--remote-debugging-port=9222`（前面需空格）
 
-### 3. 文件结构配置
+### 4. 文件结构配置
 
 在新环境下运行时，请按以下步骤初始化：
 

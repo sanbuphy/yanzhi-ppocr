@@ -7,6 +7,7 @@
 const { OpenAI } = require('openai');
 const fs = require('fs');
 const path = require('path');
+const { PaddleOcrJsClient } = require('./PaddleOcrJsClient');
 
 // 超时配置常量
 const DEFAULT_TIMEOUT_MS = 30000; // 单次 API 调用 30 秒超时
@@ -19,7 +20,7 @@ class AIClient {
         this.modelName = null;
         this.isVLM = false;
         this.siliconToken = null;
-        this.ocrModelCandidates = ['PaddlePaddle/PaddleOCR-VL-1.5'];
+        this.ocrClient = new PaddleOcrJsClient();
         this.abortController = null; // 用于取消请求
         this._initClient();
     }
@@ -82,21 +83,10 @@ class AIClient {
 
     /**
      * 初始化 AI 客户端
-     * 优先级：SiliconFlow Qwen2.5 + OCR > GitHub Models (GPT-4o)
+     * 优先级：SiliconFlow Qwen2.5 + 本地 PaddleOCR.js > GitHub Models (GPT-4o)
      */
     _initClient() {
         this._loadEnvFile();
-
-        const configuredOcrModels = String(process.env.OCR_MODEL_CANDIDATES || process.env.OCR_MODEL_NAME || '').trim();
-        if (configuredOcrModels) {
-            this.ocrModelCandidates = configuredOcrModels
-                .split(',')
-                .map((name) => name.trim())
-                .filter(Boolean);
-        }
-        if (this.ocrModelCandidates.length === 0) {
-            this.ocrModelCandidates = ['PaddlePaddle/PaddleOCR-VL-1.5'];
-        }
 
         const githubToken = process.env.GITHUB_TOKEN;
         const siliconToken = process.env.SILICONFLOW_API_KEY;
@@ -110,7 +100,7 @@ class AIClient {
             });
             this.modelName = 'Qwen/Qwen2.5-7B-Instruct';
             this.isVLM = false;
-            console.log(`✅ 使用 SiliconFlow Qwen2.5 + OCR: ${this.modelName}`);
+            console.log(`✅ 使用 SiliconFlow Qwen2.5 + 本地 PaddleOCR.js: ${this.modelName}`);
         } else if (githubToken) {
             // 使用 GitHub Models (GPT-4o 支持视觉)
             this.client = new OpenAI({
@@ -167,11 +157,6 @@ class AIClient {
             dataUrl: `data:${mimeType};base64,${base64}`,
             mimeType
         };
-    }
-
-    _buildDeepSeekOcrMarkdownPrompt(strictMode = false) {
-        void strictMode;
-        return '描述图片内容';
     }
 
     _looksLikeDegenerateRepetition(rawText) {
@@ -261,185 +246,67 @@ class AIClient {
         };
     }
 
-    _extractAssistantContent(messageContent) {
-        if (typeof messageContent === 'string') {
-            return messageContent;
-        }
-        if (Array.isArray(messageContent)) {
-            const parts = messageContent.map((part) => {
-                if (!part) return '';
-                if (typeof part === 'string') return part;
-                if (typeof part.text === 'string') return part.text;
-                if (typeof part.output_text === 'string') return part.output_text;
-                if (typeof part.content === 'string') return part.content;
-                return '';
-            }).filter(Boolean);
-            return parts.join('\n').trim();
-        }
-        if (messageContent && typeof messageContent === 'object') {
-            if (typeof messageContent.text === 'string') {
-                return messageContent.text;
-            }
-            if (typeof messageContent.output_text === 'string') {
-                return messageContent.output_text;
-            }
-        }
-        return '';
-    }
-
-    async _requestDeepSeekOcrMarkdown(imagePath, strictMode = false, ocrModelName = 'PaddlePaddle/PaddleOCR-VL-1.5', timeoutMs = OCR_SINGLE_ATTEMPT_TIMEOUT_MS, signal = null) {
-        if (!this.siliconToken) {
-            throw new Error('未配置 SILICONFLOW_API_KEY，无法调用 DeepSeek-OCR');
-        }
-
-        const ocrClient = new OpenAI({
-            baseURL: 'https://api.siliconflow.cn/v1',
-            apiKey: this.siliconToken,
-            timeout: timeoutMs
-        });
-
-        const imageData = this._imageToDataUrl(imagePath);
-        const dataUrl = imageData.dataUrl;
-        const prompt = this._buildDeepSeekOcrMarkdownPrompt(strictMode);
-
-        const requestOptions = {
-            model: ocrModelName,
-            messages: [
-                {
-                    role: 'user',
-                    content: [
-                        // Align with proven Python call shape: image first, then text instruction.
-                        { type: 'image_url', image_url: { url: dataUrl } },
-                        { type: 'text', text: prompt }
-                    ]
-                }
-            ],
-            temperature: 0.1,
-            top_p: 0.7,
-            frequency_penalty: 0.6,
-            max_tokens: strictMode ? 700 : 900
-        };
-
-        // 添加 signal 支持（如果提供）
-        if (signal) {
-            requestOptions.signal = signal;
-        }
-
-        const response = await ocrClient.chat.completions.create(requestOptions);
-
-        const rawOutput = this._extractAssistantContent(response?.choices?.[0]?.message?.content);
-        return {
-            markdown: this._normalizeOcrMarkdown(rawOutput),
-            debug: {
-                provider: 'siliconflow',
-                model: ocrModelName,
-                messageShapeVersion: 'image-first-user-only-v1',
-                mimeTypeUsed: imageData.mimeType,
-                strictMode,
-                ...this._buildResponseDebug(response, rawOutput)
-            }
-        };
-    }
-
     /**
-     * 使用 DeepSeek-OCR 生成整图结构化 Markdown 描述（含 OCR 文本）
+     * 使用本地 PaddleOCR.js 生成整图 Markdown OCR 文本
      * @param {string} imagePath
      * @param {AbortSignal} signal - 可选的取消信号
      * @param {number} maxTotalTimeMs - 总超时时间
      * @returns {Promise<{markdown: string, debug: object}>}
      */
-    async _describeImageWithDeepSeekOCR(imagePath, signal = null, maxTotalTimeMs = null) {
+    async _describeImageWithPaddleOCR(imagePath, signal = null, maxTotalTimeMs = null) {
         const ocrDebug = {
             ocrAttempted: true,
             ocrSucceeded: false,
             ocrFallbackUsed: false,
             ocrFailureReason: '',
             attempts: [],
-            candidateModels: this.ocrModelCandidates
+            engine: 'paddleocr-js'
         };
 
-        // 计算总超时时间（如果没有提供，则根据候选模型数量计算）
-        const maxTotalTime = maxTotalTimeMs || (OCR_SINGLE_ATTEMPT_TIMEOUT_MS * this.ocrModelCandidates.length * 2);
-        const startTime = Date.now();
+        try {
+            const timeoutMs = maxTotalTimeMs || OCR_SINGLE_ATTEMPT_TIMEOUT_MS;
+            const attemptResult = await this.ocrClient.recognize(imagePath, { signal, timeoutMs });
+            const valid = this._isValidOcrMarkdown(attemptResult.markdown);
+            ocrDebug.attempts.push({
+                attempt: 1,
+                valid,
+                ...attemptResult.debug
+            });
 
-        let lastError = null;
-        let attempt = 0;
-        for (const modelName of this.ocrModelCandidates) {
-            for (const strictMode of [false, true]) {
-                // 检查是否已取消
-                if (signal && signal.aborted) {
-                    const abortError = new Error('请求已取消');
-                    abortError.name = 'AbortError';
-                    abortError.ocrDebug = ocrDebug;
-                    throw abortError;
-                }
-
-                // 检查是否总超时
-                if (Date.now() - startTime > maxTotalTime) {
-                    const timeoutError = new Error('OCR 总超时');
-                    timeoutError.ocrDebug = ocrDebug;
-                    throw timeoutError;
-                }
-
-                attempt += 1;
-                try {
-                    const attemptResult = await this._requestDeepSeekOcrMarkdown(imagePath, strictMode, modelName, OCR_SINGLE_ATTEMPT_TIMEOUT_MS, signal);
-                    const valid = this._isValidOcrMarkdown(attemptResult.markdown);
-                    ocrDebug.attempts.push({
-                        attempt,
-                        strictMode,
-                        valid,
-                        ...attemptResult.debug
-                    });
-
-                    if (valid) {
-                        ocrDebug.ocrSucceeded = true;
-                        return {
-                            markdown: attemptResult.markdown,
-                            debug: ocrDebug
-                        };
-                    }
-
-                    if (!strictMode) {
-                        console.warn(`⚠️ OCR 模型 ${modelName} 首次输出无效，正在严格模式重试...`);
-                    }
-                } catch (error) {
-                    // 如果是取消错误，直接抛出
-                    if (error.name === 'AbortError') {
-                        throw error;
-                    }
-
-                    lastError = error;
-                    ocrDebug.attempts.push({
-                        attempt,
-                        strictMode,
-                        valid: false,
-                        requestId: '',
-                        model: modelName,
-                        created: null,
-                        finishReason: '',
-                        usage: {
-                            promptTokens: null,
-                            completionTokens: null,
-                            totalTokens: null
-                        },
-                        rawOutput: '',
-                        error: error.message || String(error)
-                    });
-                    if (!strictMode) {
-                        console.warn(`⚠️ OCR 模型 ${modelName} 首次请求失败，正在严格模式重试: ${error.message || String(error)}`);
-                    }
-                }
+            if (valid) {
+                ocrDebug.ocrSucceeded = true;
+                return {
+                    markdown: attemptResult.markdown,
+                    debug: ocrDebug
+                };
             }
-        }
 
-        ocrDebug.ocrFallbackUsed = true;
-        ocrDebug.ocrFailureReason = lastError
-            ? `OCR 模型请求失败：${lastError.message || String(lastError)}`
-            : `OCR 模型返回内容格式无效（候选模型: ${this.ocrModelCandidates.join(', ')}）`;
-        const error = new Error(ocrDebug.ocrFailureReason);
-        error.ocrDebug = ocrDebug;
-        throw error;
+            ocrDebug.ocrFallbackUsed = true;
+            ocrDebug.ocrFailureReason = 'PaddleOCR.js 未识别到有效文本';
+            const error = new Error(ocrDebug.ocrFailureReason);
+            error.ocrDebug = ocrDebug;
+            throw error;
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                error.ocrDebug = ocrDebug;
+                throw error;
+            }
+
+            if (ocrDebug.attempts.length === 0) {
+                ocrDebug.attempts.push({
+                    attempt: 1,
+                    valid: false,
+                    provider: 'paddleocr-js',
+                    rawOutput: '',
+                    error: error.message || String(error)
+                });
+            }
+
+            ocrDebug.ocrFallbackUsed = true;
+            ocrDebug.ocrFailureReason = `PaddleOCR.js 识别失败：${error.message || String(error)}`;
+            error.ocrDebug = ocrDebug;
+            throw error;
+        }
     }
 
     /**
@@ -463,7 +330,7 @@ class AIClient {
      * @param {number} maxTokens - 最大 token 数
      * @param {number} timeoutMs - 超时时间（毫秒）
      * @param {AbortSignal} signal - 取消信号
-    * @returns {Promise<{finalAnswer: string, ocrStructuredMarkdown: string, usedOcr: boolean, model: string, isVLM: boolean, ocrDebug: object, finalAnswerDebug: object}>}
+     * @returns {Promise<{finalAnswer: string, ocrStructuredMarkdown: string, usedOcr: boolean, model: string, isVLM: boolean, ocrDebug: object, finalAnswerDebug: object}>}
      */
     async askWithOcrAudit(text, imagePath = null, temperature = 0.7, maxTokens = 2000, timeoutMs = DEFAULT_TIMEOUT_MS, signal = null) {
         if (!text && !imagePath) {
@@ -493,24 +360,13 @@ class AIClient {
             content.push({ type: 'text', text });
         }
 
-        if (imagePath && this.isVLM) {
-            // 如果支持 VLM 且有图片，添加图片
-            try {
-                const dataUrl = this._imageToBase64(imagePath);
-                content.push({
-                    type: 'image_url',
-                    image_url: { url: dataUrl }
-                });
-            } catch (e) {
-                console.warn(`⚠️ 图片处理失败：${e.message}`);
-            }
-        } else if (imagePath && !this.isVLM) {
-            // 非 VLM 模型：调用 DeepSeek-OCR 生成整图结构化描述，再拼到提示词
+        if (imagePath) {
+            // 先调用本地 PaddleOCR.js 生成整图 OCR 文本，再拼到提示词
             ocrDebug.ocrAttempted = true;
             try {
                 // 计算剩余时间用于 OCR
                 const ocrMaxTime = timeoutMs ? Math.min(timeoutMs * 0.6, 45000) : 45000;
-                const ocrPayload = await this._describeImageWithDeepSeekOCR(imagePath, signal, ocrMaxTime);
+                const ocrPayload = await this._describeImageWithPaddleOCR(imagePath, signal, ocrMaxTime);
                 ocrDebug = ocrPayload.debug || ocrDebug;
                 const ocrDescription = ocrPayload.markdown || '';
                 if (ocrDescription) {
@@ -537,6 +393,18 @@ class AIClient {
                     ocrFailureReason: fallbackDebug.ocrFailureReason || e.message || '未知 OCR 错误'
                 };
                 console.warn(`⚠️ OCR 回退失败：${e.message}`);
+            }
+
+            if (this.isVLM) {
+                try {
+                    const dataUrl = this._imageToBase64(imagePath);
+                    content.push({
+                        type: 'image_url',
+                        image_url: { url: dataUrl }
+                    });
+                } catch (e) {
+                    console.warn(`⚠️ 图片处理失败：${e.message}`);
+                }
             }
         }
 
@@ -617,7 +485,7 @@ class AIClient {
         ocrDebug.ocrAttempted = true;
         try {
             const ocrMaxTime = timeoutMs ? Math.min(timeoutMs * 0.6, 45000) : 45000;
-            const ocrPayload = await this._describeImageWithDeepSeekOCR(imagePath, signal, ocrMaxTime);
+            const ocrPayload = await this._describeImageWithPaddleOCR(imagePath, signal, ocrMaxTime);
             ocrDebug = { ...ocrDebug, ...ocrPayload.debug };
             const ocrDescription = ocrPayload.markdown || '';
             if (ocrDescription) {
@@ -703,21 +571,10 @@ class AIClient {
             content.push({ type: 'text', text });
         }
 
-        if (imagePath && this.isVLM) {
+        if (imagePath) {
             try {
-                const dataUrl = this._imageToBase64(imagePath);
-                content.push({
-                    type: 'image_url',
-                    image_url: { url: dataUrl }
-                });
-            } catch (e) {
-                console.warn(`⚠️ 图片处理失败：${e.message}`);
-            }
-        } else if (imagePath && !this.isVLM) {
-            try {
-                // 计算剩余时间用于 OCR
                 const ocrMaxTime = timeoutMs ? Math.min(timeoutMs * 0.6, 45000) : 45000;
-                const ocrPayload = await this._describeImageWithDeepSeekOCR(imagePath, signal, ocrMaxTime);
+                const ocrPayload = await this._describeImageWithPaddleOCR(imagePath, signal, ocrMaxTime);
                 const ocrDescription = ocrPayload.markdown || '';
                 if (ocrDescription) {
                     const ocrPrompt = `\n\n${ocrDescription}`;
@@ -733,6 +590,18 @@ class AIClient {
                     throw e;
                 }
                 console.warn(`⚠️ OCR 回退失败：${e.message}`);
+            }
+
+            if (this.isVLM) {
+                try {
+                    const dataUrl = this._imageToBase64(imagePath);
+                    content.push({
+                        type: 'image_url',
+                        image_url: { url: dataUrl }
+                    });
+                } catch (e) {
+                    console.warn(`⚠️ 图片处理失败：${e.message}`);
+                }
             }
         }
 
@@ -814,7 +683,7 @@ class AIClient {
         // 使用 OCR 处理图片
         try {
             const ocrMaxTime = timeoutMs ? Math.min(timeoutMs * 0.6, 45000) : 45000;
-            const ocrPayload = await this._describeImageWithDeepSeekOCR(imagePath, signal, ocrMaxTime);
+            const ocrPayload = await this._describeImageWithPaddleOCR(imagePath, signal, ocrMaxTime);
             const ocrDescription = ocrPayload.markdown || '';
             if (ocrDescription) {
                 const ocrPrompt = `\n\n${ocrDescription}`;

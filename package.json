@@ -9,7 +9,10 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "echo \"No linting configured\""
+    "lint": "echo \"No linting configured\"",
+    "build:paddleocr-js": "node scripts/build-paddleocr-js-bundle.js",
+    "download:paddleocr-js-models": "node scripts/download-paddleocr-js-models.js",
+    "test:paddleocr-js": "electron scripts/run-paddleocr-js-test.js"
   },
   "keywords": [],
   "author": {
@@ -18,12 +21,12 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@paddleocr/paddleocr-js": "^0.3.2",
     "electron-squirrel-startup": "^1.0.1",
     "koffi": "^2.15.1",
     "openai": "^6.27.0",
     "pdf-parse": "^2.4.5",
-    "puppeteer-core": "^24.38.0",
-    "tesseract.js": "^7.0.0"
+    "puppeteer-core": "^24.38.0"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.10.2",
@@ -34,7 +37,8 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.10.2",
     "@electron-forge/plugin-fuses": "^7.10.2",
     "@electron/fuses": "^1.8.0",
-    "electron": "^39.8.0"
+    "electron": "^39.8.0",
+    "webpack": "^5.105.4"
   },
   "repository": {
     "type": "git",

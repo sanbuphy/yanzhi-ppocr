@@ -94,3 +94,6 @@ workspaces/
 temp/
 .claude/
 data/workspaces/
+
+# Generated PaddleOCR.js browser bundle and local model cache
+src/screenshot/vendor/

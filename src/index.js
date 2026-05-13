@@ -3,10 +3,12 @@ const path = require('node:path');
 const fs = require('fs');
 const os = require('os');
 const metadataManager = require('./utils/MetadataManager');
+const { registerPaddleOcrProtocolScheme } = require('./screenshot/PaddleOcrJsClient');
 
 // 禁用 GPU 和沙箱以避免在受限环境中崩溃
 app.commandLine.appendSwitch('no-sandbox');
 app.disableHardwareAcceleration();
+registerPaddleOcrProtocolScheme();
 
 // 引入原生 AI 服务模块
 const { askAI, readPdf, searchArxiv, downloadArxivPdf } = require('./utils/AIProvider');
