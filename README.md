@@ -117,15 +117,15 @@ npm start
 - 前往 [硅基流动官网](https://cloud.siliconflow.cn/) 注册并申请 API Key
 - 将申请到的 Key 填入 [data/token.env](data/token.env)（将 txt 后缀改为 env）
 
-### 2. PaddleOCR.js 配置
+### 2. PaddleOCR.js 本地 OCR 配置与调用链
 
-当前 OCR 使用官方浏览器推理 SDK `@paddleocr/paddleocr-js@0.3.2`，模型版本为 `PP-OCRv5`：
+当前 OCR 使用官方浏览器推理 SDK `@paddleocr/paddleocr-js@0.3.2`，在 Electron 本地 BrowserWindow 中运行，不依赖 PaddleOCR-VL、Python 服务或云端 OCR。当前模型版本为 `PP-OCRv5`：
 
 - 检测模型：`PP-OCRv5_mobile_det`
 - 识别模型：`PP-OCRv5_mobile_rec`
 - 默认语言：`ch`
 - 默认推理后端：`auto`，测试脚本固定使用 `wasm`
-- 运行方式：Electron 主进程注册 `ppocrjs://local` 本地协议，在隐藏 BrowserWindow 中注入 PaddleOCR.js bundle，模型与 ORT wasm 均从本地缓存读取，不调用 PaddleOCR-VL 或 Python OCR。
+- 运行方式：Electron 主进程注册 `ppocrjs://local` 本地协议，在隐藏 BrowserWindow 中注入 PaddleOCR.js bundle，模型与 ORT wasm 均从本地缓存读取
 
 可选环境变量：
 
@@ -145,17 +145,66 @@ npm run build:paddleocr-js
 npm run download:paddleocr-js-models
 ```
 
-本地 OCR 调用入口：
+#### 应用内使用方式
 
-- 应用内截图识别：`src/screenshot/aiClient.js` 创建 `PaddleOcrJsClient`，调用 `recognize(imagePath)` 后把 OCR 文本拼入 Qwen 提示词。
-- PaddleOCR.js 封装：`src/screenshot/PaddleOcrJsClient.js` 负责注册本地协议、加载 SDK bundle、加载本地模型、执行 `PaddleOCR.create()` 和 `ocr.predict()`。
-- 独立验证命令：
+截图编辑器底部提供两个独立入口：
+
+- `OCR识别`：只调用本地 PaddleOCR.js。识别完成后弹出结果面板，显示“本模型由 PaddleOCR.js PP-OCRv5 本地模型支持”、检测模型、识别模型、推理后端、耗时、检测框数量和识别行数。面板支持复制文本，也支持点击 `发送到输入框`，把 OCR 文本流转到主界面右侧 AI 输入框。
+- `AI解读`：先调用本地 PaddleOCR.js 生成 OCR 文本，再把 OCR 文本拼入提示词交给 AI 做解释、整理和分类。如果没有配置 `GITHUB_TOKEN` 或 `SILICONFLOW_API_KEY`，截图编辑器仍会正常打开，并回退为“本地 OCR only”结果，不会阻塞截图流程。
+- `完成`：把编辑后的截图复制到剪贴板。
+- `取消`：关闭截图编辑器；如果正在 OCR/AI 请求中，则优先取消当前请求。
+
+#### 技术调用链
+
+本地 OCR 的核心文件与 IPC 流程：
+
+- `src/screenshot/ScreenshotWindow.js`：创建覆盖所有屏幕的截图选区窗口，返回屏幕绝对坐标。
+- `src/screenshot/index.js`：根据选区调用 Electron `desktopCapturer` 截取目标屏幕区域，并把 PNG buffer 交给编辑器。
+- `src/screenshot/EditorWindow.js`：创建截图编辑器窗口，注册 `editor:ocr-recognize`、`editor:ai-explain-and-classify`、`editor:send-ocr-to-input` 等 IPC handler。
+- `src/screenshot/editor.html`：提供 `OCR识别`、`AI解读`、复制、发送到输入框等界面交互。
+- `src/screenshot/PaddleOcrJsClient.js`：封装 PaddleOCR.js 本地推理。它会启动隐藏 BrowserWindow，加载 `ppocrjs://local/worker.html`，注入 `src/screenshot/vendor/paddleocr-js/paddleocr-js.bundle.js`，再从 `src/screenshot/vendor/paddleocr-js-models` 读取 PP-OCRv5 ONNX tar 模型。
+- `src/preload.js` 与 `src/main/main.js`：通过 `chat:insert-text` 把 OCR 结果发送回主窗口，并写入 `#chatInput`。
+
+OCR 单独调用入口：
+
+```js
+const { PaddleOcrJsClient } = require('./src/screenshot/PaddleOcrJsClient');
+
+const client = new PaddleOcrJsClient({
+  lang: 'ch',
+  ocrVersion: 'PP-OCRv5',
+  backend: 'wasm'
+});
+
+const result = await client.recognize('/absolute/path/to/image.png');
+console.log(result.markdown);
+console.log(result.debug.metrics);
+client.dispose();
+```
+
+返回结构包括：
+
+- `markdown`：按识别顺序拼接的 OCR 文本
+- `debug.provider`：固定为 `paddleocr-js`
+- `debug.ocrVersion`：当前 OCR 版本，如 `PP-OCRv5`
+- `debug.backend`：请求的推理后端
+- `debug.lines`：逐行文本、置信度和文本框坐标
+- `debug.metrics`：检测耗时、识别耗时、总耗时、检测框数量、识别行数
+- `debug.runtime`：实际 det/rec provider 与 WebGPU 可用性
+
+独立验证命令：
 
 ```bash
 npm run test:paddleocr-js
 ```
 
-验证通过时会输出 `ok: true`，并返回识别文本、置信度、耗时指标和实际运行后端。
+验证通过时会输出 `ok: true`，并返回识别文本、置信度、耗时指标和实际运行后端。当前测试图的期望识别文本示例：
+
+```text
+PPOCR TEST
+Hello 2026
+LOCAL DETECTION
+```
 
 ### 3. 浏览器配置 (Edge)
 

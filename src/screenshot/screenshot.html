@@ -91,6 +91,10 @@
             overlayCtx.fillRect(0, 0, overlay.width, overlay.height);
         }
 
+        function clearOverlay() {
+            overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+        }
+
         initOverlayCanvas();
         window.addEventListener('resize', initOverlayCanvas);
 
@@ -127,6 +131,7 @@
             selectionEl.style.height = height + 'px';
 
             selection = { x: left, y: top, width, height };
+            applyOverlay(selection);
         });
 
         // 鼠标释放 - 完成选择
@@ -144,11 +149,12 @@
                     width: Math.round(selection.width),
                     height: Math.round(selection.height)
                 };
+                console.log('[Screenshot] absolute selection:', absoluteSelection);
                 selectionEl.style.display = 'none';
-                resetOverlay();
+                clearOverlay();
                 setTimeout(() => {
                     ipcRenderer.send('screenshot:confirm', absoluteSelection);
-                }, 20);
+                }, 50);
             } else {
                 // 选区太小，重置
                 console.warn('[Screenshot] 选区太小，重置');

@@ -86,6 +86,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     process: (instruction, context) => ipcRenderer.invoke('agent:process', instruction, context),
   },
 
+  // 编辑器到主输入框
+  chat: {
+    onInsertText: (callback) => {
+      const listener = (_event, payload) => callback(payload);
+      ipcRenderer.on('chat:insert-text', listener);
+      return () => ipcRenderer.removeListener('chat:insert-text', listener);
+    }
+  },
+
   // Shell 操作（在默认浏览器打开链接）
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),

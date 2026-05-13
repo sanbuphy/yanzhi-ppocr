@@ -608,12 +608,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   setupEventListeners();
+  setupChatInsertListener();
   loadChatHistory();
   initCollapseButtons();
   
   // 检查是否有从其他页面跳转过来的待处理文件
   await handlePendingFile();
 });
+
+function setupChatInsertListener() {
+  if (!window.electronAPI || !window.electronAPI.chat || typeof window.electronAPI.chat.onInsertText !== 'function') {
+    return;
+  }
+
+  window.electronAPI.chat.onInsertText((payload) => {
+    const text = payload && typeof payload === 'object' ? payload.text : payload;
+    const source = payload && typeof payload === 'object' ? payload.source : 'ocr';
+    insertTextIntoChatInput(text, source === 'paddleocr-js' ? 'ocr' : source);
+  });
+}
 
 // 处理从其他页面跳转过来的待处理文件
 async function handlePendingFile() {
@@ -2105,6 +2118,29 @@ async function sendMessage() {
   await callAI(message);
 }
 
+function insertTextIntoChatInput(text, source = 'ocr') {
+  const input = document.getElementById('chatInput');
+  if (!input) return false;
+
+  const normalized = String(text || '')
+    .replace(/\r?\n+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  if (!normalized) {
+    return false;
+  }
+
+  const current = input.value.trim();
+  input.value = current ? `${current} ${normalized}` : normalized;
+  input.focus();
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  if (typeof showMainToast === 'function') {
+    showMainToast(source === 'ocr' ? 'OCR 文本已填入输入框' : '文本已填入输入框', 'success');
+  }
+  return true;
+}
+
 // 调用 AI API
 async function callAI(userQuery) {
   try {
@@ -3082,4 +3118,3 @@ async function saveTemplateFromEditor() {
 async function createCustomTemplate() {
   showTemplateEditor();
 }
-

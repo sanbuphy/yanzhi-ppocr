@@ -7,6 +7,7 @@ const { BrowserWindow, screen, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { AIClient } = require('./aiClient');
+const { PaddleOcrJsClient } = require('./PaddleOcrJsClient');
 const { getAgent } = require('../agent/index');
 
 const IMAGE_EXPLANATION_TIMEOUT_MS = 60000; // 60 秒超时
@@ -23,8 +24,52 @@ class EditorWindow {
         this.cancelListener = null;
         this.tempImagePath = null; // 追踪临时图片路径
         this.currentAbortController = null; // 当前请求的 AbortController
+        this.hasSentImage = false;
         this.log = (...args) => console.log('[EditorWindow]', ...args);
-        this.aiClient = new AIClient("你是一个图像分析和解读助手，专门对截图、图表、公式等进行详细解读。");
+        this.aiSystemPrompt = "你是一个图像分析和解读助手，专门对截图、图表、公式等进行详细解读。";
+        this.aiClient = null;
+        this.ocrClient = new PaddleOcrJsClient();
+    }
+
+    getAiClient() {
+        if (!this.aiClient) {
+            this.aiClient = new AIClient(this.aiSystemPrompt);
+        }
+        return this.aiClient;
+    }
+
+    isMissingAiCredentialError(error) {
+        return Boolean(error && error.message && error.message.includes('GITHUB_TOKEN 或 SILICONFLOW_API_KEY'));
+    }
+
+    async runOcrOnlyAudit(imagePath, signal = null, timeoutMs = IMAGE_EXPLANATION_TIMEOUT_MS, cause = null) {
+        const ocrTimeoutMs = timeoutMs ? Math.min(timeoutMs * 0.8, 45000) : 45000;
+        const ocrPayload = await this.ocrClient.recognize(imagePath, { signal, timeoutMs: ocrTimeoutMs });
+        const ocrText = ocrPayload.markdown || '';
+        const causeText = cause && cause.message ? cause.message : '';
+
+        return {
+            finalAnswer: [
+                '未配置 AI API token，已跳过云端 AI 解读。',
+                ocrText ? '下方是本地 PaddleOCR.js 识别出的文字。' : '本地 PaddleOCR.js 未识别到文字。',
+                causeText ? `原因：${causeText}` : ''
+            ].filter(Boolean).join('\n'),
+            ocrStructuredMarkdown: ocrText,
+            usedOcr: true,
+            model: 'PaddleOCR.js PP-OCRv5 local only',
+            isVLM: false,
+            ocrDebug: {
+                ocrAttempted: true,
+                ocrSucceeded: true,
+                ocrFallbackUsed: false,
+                ocrFailureReason: '',
+                ...(ocrPayload.debug || {})
+            },
+            finalAnswerDebug: {
+                provider: 'local-ocr-only',
+                rawOutput: ''
+            }
+        };
     }
 
     /**
@@ -42,8 +87,14 @@ class EditorWindow {
         this.onClose = onClose;
 
         const { width, height } = selection;
-        const primaryDisplay = screen.getPrimaryDisplay();
-        const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+        const centerPoint = {
+            x: selection.x + Math.floor(selection.width / 2),
+            y: selection.y + Math.floor(selection.height / 2)
+        };
+        const targetDisplay = screen.getDisplayNearestPoint(centerPoint);
+        const workArea = targetDisplay.workArea || targetDisplay.bounds;
+        const screenW = workArea.width;
+        const screenH = workArea.height;
 
         // 编辑舞台四周留暗区，保持被编辑区域与背景区分
         const toolbarHeight = 64;
@@ -72,14 +123,30 @@ class EditorWindow {
         let winX = selection.x - stagePadding;
         let winY = selection.y - stagePadding;
 
-        winX = Math.max(0, Math.min(winX, Math.max(0, screenW - winWidth)));
-        winY = Math.max(0, Math.min(winY, Math.max(0, screenH - winHeight)));
+        winX = Math.max(workArea.x, Math.min(winX, workArea.x + Math.max(0, screenW - winWidth)));
+        winY = Math.max(workArea.y, Math.min(winY, workArea.y + Math.max(0, screenH - winHeight)));
+
+        const finalWidth = Math.min(winWidth, screenW);
+        const finalHeight = Math.min(winHeight, screenH);
+
+        this.log('window layout', {
+            selection,
+            targetDisplay: {
+                id: targetDisplay.id,
+                bounds: targetDisplay.bounds,
+                workArea,
+                scaleFactor: targetDisplay.scaleFactor
+            },
+            image: { width, height, displayWidth, displayHeight, scale },
+            window: { x: winX, y: winY, width: finalWidth, height: finalHeight }
+        });
 
         this.window = new BrowserWindow({
-            width: Math.min(winWidth, screenW),
-            height: Math.min(winHeight, screenH),
+            width: finalWidth,
+            height: finalHeight,
             x: winX,
             y: winY,
+            show: false,
             frame: false,
             transparent: false,
             alwaysOnTop: true,
@@ -97,12 +164,39 @@ class EditorWindow {
         });
 
         // 加载编辑器页面
-        this.window.loadFile('src/screenshot/editor.html');
+        this.window.loadFile(path.join(__dirname, 'editor.html')).catch((error) => {
+            this.log('loadFile failed', { message: error.message, stack: error.stack });
+            if (!this.window || this.window.isDestroyed()) return;
+            this.window.show();
+            this.window.focus();
+        });
+
+        const showAndSendImage = (reason) => {
+            if (!this.window || this.window.isDestroyed()) return;
+            this.log('showAndSendImage', { reason, hasSentImage: this.hasSentImage });
+            this.window.show();
+            this.window.setAlwaysOnTop(true, 'screen-saver');
+            this.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+            this.window.moveTop();
+            this.window.focus();
+
+            if (!this.hasSentImage) {
+                this.hasSentImage = true;
+                this.sendImageToRenderer();
+            }
+        };
 
         // 窗口准备好后发送图片
         this.window.once('ready-to-show', () => {
-            this.window.show();
-            this.sendImageToRenderer();
+            showAndSendImage('ready-to-show');
+        });
+
+        this.window.webContents.once('did-finish-load', () => {
+            setTimeout(() => showAndSendImage('did-finish-load-fallback'), 120);
+        });
+
+        this.window.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+            this.log('did-fail-load', { errorCode, errorDescription, validatedURL });
         });
 
         this.window.on('closed', () => {
@@ -120,6 +214,7 @@ class EditorWindow {
             }
             this.onClose = null;
             this.window = null;
+            this.hasSentImage = false;
         });
 
         this.window.webContents.on('render-process-gone', (event, details) => {
@@ -161,6 +256,8 @@ class EditorWindow {
         const saveChannel = 'editor:save-image';
         const aiChannel = 'editor:ai-explain';
         const aiClassifyChannel = 'editor:ai-explain-and-classify';
+        const ocrChannel = 'editor:ocr-recognize';
+        const sendOcrToInputChannel = 'editor:send-ocr-to-input';
         const saveToFolderChannel = 'editor:save-to-folder';
         const browseFolderChannel = 'editor:browse-folder';
         const finishChannel = 'editor:finish';
@@ -170,6 +267,8 @@ class EditorWindow {
         ipcMain.removeHandler(saveChannel);
         ipcMain.removeHandler(aiChannel);
         ipcMain.removeHandler(aiClassifyChannel);
+        ipcMain.removeHandler(ocrChannel);
+        ipcMain.removeHandler(sendOcrToInputChannel);
         ipcMain.removeHandler(saveToFolderChannel);
         ipcMain.removeHandler(browseFolderChannel);
         ipcMain.removeHandler(finishChannel);
@@ -204,6 +303,18 @@ class EditorWindow {
         ipcMain.handle(aiClassifyChannel, async (event, base64) => {
             if (!isFromEditorWindow(event)) return { ocrText: '', aiExplanation: '', classifyResult: null };
             return await this.aiExplainAndClassify(base64);
+        });
+
+        // 仅本地 OCR 识别
+        ipcMain.handle(ocrChannel, async (event, base64) => {
+            if (!isFromEditorWindow(event)) return { success: false, error: '无效窗口请求' };
+            return await this.recognizeOcr(base64);
+        });
+
+        // 将 OCR 文本发送到主窗口输入框
+        ipcMain.handle(sendOcrToInputChannel, async (event, text) => {
+            if (!isFromEditorWindow(event)) return { success: false, error: '无效窗口请求' };
+            return this.sendTextToMainInput(text);
         });
 
         // 保存图片到指定文件夹
@@ -267,6 +378,8 @@ class EditorWindow {
         ipcMain.removeHandler('editor:save-image');
         ipcMain.removeHandler('editor:ai-explain');
         ipcMain.removeHandler('editor:ai-explain-and-classify');
+        ipcMain.removeHandler('editor:ocr-recognize');
+        ipcMain.removeHandler('editor:send-ocr-to-input');
         ipcMain.removeHandler('editor:save-to-folder');
         ipcMain.removeHandler('editor:browse-folder');
         ipcMain.removeHandler('editor:finish');
@@ -275,6 +388,83 @@ class EditorWindow {
             ipcMain.removeListener('editor:cancel', this.cancelListener);
             this.cancelListener = null;
         }
+    }
+
+    buildOcrModelDescription(debug = {}) {
+        const detModel = this.ocrClient.textDetectionModelName || 'PP-OCRv5_mobile_det';
+        const recModel = this.ocrClient.textRecognitionModelName || 'PP-OCRv5_mobile_rec';
+        const version = debug.ocrVersion || this.ocrClient.ocrVersion || 'PP-OCRv5';
+        const backend = (debug.runtime && (debug.runtime.detProvider || debug.runtime.requestedBackend)) || this.ocrClient.backend || 'auto';
+        return `本模型由 PaddleOCR.js ${version} 本地模型支持：检测模型 ${detModel}，识别模型 ${recModel}，推理后端 ${backend}。`;
+    }
+
+    async recognizeOcr(base64) {
+        let tempPath = null;
+        if (this.currentAbortController) {
+            this.currentAbortController.abort();
+        }
+        this.currentAbortController = new AbortController();
+        const signal = this.currentAbortController.signal;
+
+        try {
+            tempPath = await this.saveImage(base64 || `data:image/png;base64,${this.screenshotBuffer.toString('base64')}`);
+            const payload = await this.ocrClient.recognize(tempPath, {
+                signal,
+                timeoutMs: IMAGE_EXPLANATION_TIMEOUT_MS
+            });
+            const debug = payload.debug || {};
+            return {
+                success: true,
+                ocrText: payload.markdown || '',
+                modelDescription: this.buildOcrModelDescription(debug),
+                debug
+            };
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                return { success: false, canceled: true, error: 'OCR 识别已取消' };
+            }
+            console.error('OCR 识别失败:', error);
+            return { success: false, error: error.message || String(error) };
+        } finally {
+            this.currentAbortController = null;
+            if (tempPath && fs.existsSync(tempPath)) {
+                fs.unlinkSync(tempPath);
+            }
+        }
+    }
+
+    sendTextToMainInput(text) {
+        const normalizedText = String(text || '').trim();
+        if (!normalizedText) {
+            return { success: false, error: '没有可发送的 OCR 文本' };
+        }
+
+        const targetWindow = BrowserWindow.getAllWindows().find((win) => {
+            if (!win || win.isDestroyed() || !win.webContents || win.webContents.isDestroyed()) {
+                return false;
+            }
+            try {
+                const url = win.webContents.getURL();
+                return url.includes('/src/main/main.html') || url.endsWith('/main.html');
+            } catch (error) {
+                return false;
+            }
+        });
+
+        if (!targetWindow) {
+            return { success: false, error: '未找到主窗口输入框' };
+        }
+
+        targetWindow.webContents.send('chat:insert-text', {
+            text: normalizedText,
+            source: 'paddleocr-js'
+        });
+        if (targetWindow.isMinimized()) {
+            targetWindow.restore();
+        }
+        targetWindow.show();
+        targetWindow.focus();
+        return { success: true };
     }
 
     /**
@@ -317,7 +507,8 @@ class EditorWindow {
             tempPath = await this.saveImage(base64 || `data:image/png;base64,${this.screenshotBuffer.toString('base64')}`);
 
             // 调用 AI（带超时和取消支持）
-            const explanation = await this.aiClient.askWithOcrAudit(
+            const aiClient = this.getAiClient();
+            const explanation = await aiClient.askWithOcrAudit(
                 "请对这张图片进行详细解读和分析。\n\n要求：\n1. 描述图片的主要内容和核心信息\n2. 如果包含公式、代码或图表，请解释其含义和作用\n3. 如果是技术内容，请提供易于理解的解释\n4. 总结该图片对学习/研究的价值",
                 tempPath,
                 0.5,
@@ -333,6 +524,9 @@ class EditorWindow {
                 return AI_TIMEOUT_TEXT;
             }
             console.error('AI 解释失败:', error);
+            if (this.isMissingAiCredentialError(error) && tempPath) {
+                return await this.runOcrOnlyAudit(tempPath, signal, IMAGE_EXPLANATION_TIMEOUT_MS, error);
+            }
             throw error;
         } finally {
             this.currentAbortController = null;
@@ -365,7 +559,8 @@ class EditorWindow {
             // 2. 执行 OCR + AI 解读（带超时和取消支持）
             let explanation;
             try {
-                explanation = await this.aiClient.askWithOcrAudit(
+                const aiClient = this.getAiClient();
+                explanation = await aiClient.askWithOcrAudit(
                     "请对这张图片进行详细解读和分析。\n\n要求：\n1. 描述图片的主要内容和核心信息\n2. 如果包含公式、代码或图表，请解释其含义和作用\n3. 如果是技术内容，请提供易于理解的解释\n4. 总结该图片对学习/研究的价值",
                     tempPath,
                     0.5,
@@ -378,7 +573,11 @@ class EditorWindow {
                 if (error.name === 'AbortError') {
                     return { ocrText: '', aiExplanation: AI_TIMEOUT_TEXT, classifyResult: null };
                 }
-                throw error;
+                if (this.isMissingAiCredentialError(error)) {
+                    explanation = await this.runOcrOnlyAudit(tempPath, signal, IMAGE_EXPLANATION_TIMEOUT_MS, error);
+                } else {
+                    throw error;
+                }
             }
 
             // 提取 OCR 文本和 AI 解释

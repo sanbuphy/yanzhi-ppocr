@@ -374,6 +374,14 @@
             background: #256a2a;
         }
 
+        .result-btn.send {
+            background: #1976d2;
+        }
+
+        .result-btn.send:hover {
+            background: #155fa8;
+        }
+
         .result-btn.close {
             background: #4d4d4d;
         }
@@ -751,6 +759,7 @@
             </div>
 
             <div class="tool-group actions">
+                <button class="tool-btn" id="ocr-btn">OCR识别</button>
                 <button class="tool-btn" id="ai-btn">AI解读</button>
                 <button class="tool-btn primary" id="finish-btn">完成</button>
                 <button class="tool-btn cancel" id="cancel-btn">取消</button>
@@ -777,6 +786,7 @@
             <div id="result-content"></div>
             <div id="result-actions">
                 <button class="result-btn copy" id="result-copy-btn">复制内容</button>
+                <button class="result-btn send" id="result-send-input-btn" style="display:none;">发送到输入框</button>
                 <button class="result-btn close" id="result-close-btn">关闭</button>
             </div>
         </div>
@@ -830,6 +840,7 @@
         const resultPanel = document.getElementById('result-panel');
         const resultHeader = document.getElementById('result-header');
         const resultCopyBtn = document.getElementById('result-copy-btn');
+        const resultSendInputBtn = document.getElementById('result-send-input-btn');
         const resultCloseBtn = document.getElementById('result-close-btn');
         const resultCloseX = document.getElementById('result-close-x');
         const resultBackdrop = document.getElementById('result-backdrop');
@@ -844,6 +855,7 @@
         let lastY = 0;
         let activeTextInput = null;
         let lastModalText = '';
+        let lastTransferText = '';
         let isDraggingResultPanel = false;
         let dragPanelOffsetX = 0;
         let dragPanelOffsetY = 0;
@@ -875,7 +887,11 @@
             return buildMergedCanvas().toDataURL('image/png');
         }
 
-        function setLoading(visible) {
+        function setLoading(visible, message = 'AI 正在处理中...') {
+            const loadingText = loading.querySelector('.loading-text');
+            if (loadingText) {
+                loadingText.textContent = message;
+            }
             loading.style.display = visible ? 'flex' : 'none';
         }
 
@@ -912,6 +928,9 @@
             const hideCopy = options.hideCopy === true;
             resultCopyBtn.style.display = hideCopy ? 'none' : 'inline-block';
             resultCopyBtn.textContent = '复制内容';
+            lastTransferText = String(options.transferText || '').trim();
+            resultSendInputBtn.style.display = lastTransferText ? 'inline-block' : 'none';
+            resultSendInputBtn.textContent = '发送到输入框';
 
             resultModal.style.display = 'block';
 
@@ -1066,6 +1085,9 @@
 
             resultCopyBtn.style.display = 'inline-block';
             resultCopyBtn.textContent = '复制内容';
+            lastTransferText = '';
+            resultSendInputBtn.style.display = 'none';
+            resultSendInputBtn.textContent = '发送到输入框';
             resultModal.style.display = 'block';
 
             const panelWidth = Math.min(760, window.innerWidth - 36);
@@ -1538,16 +1560,91 @@
             savePanelContent.style.left = `${left}px`;
         }
 
+        function showOcrResultModal(payload) {
+            const ocrText = String((payload && payload.ocrText) || '').trim();
+            const modelDescription = String((payload && payload.modelDescription) || '本模型由 PaddleOCR.js PP-OCRv5 本地模型支持。').trim();
+            const debug = payload && payload.debug ? payload.debug : null;
+            const metrics = debug && debug.metrics ? debug.metrics : null;
+            const runtime = debug && debug.runtime ? debug.runtime : null;
+
+            const metaLines = [
+                modelDescription,
+                metrics ? `耗时：${Math.round(metrics.totalMs || 0)}ms，检测框：${metrics.detectedBoxes || 0}，识别行：${metrics.recognizedCount || 0}` : '',
+                runtime ? `运行时：det=${runtime.detProvider || '-'}，rec=${runtime.recProvider || '-'}，WebGPU=${runtime.webgpuAvailable ? '可用' : '不可用'}` : ''
+            ].filter(Boolean);
+
+            resultTitle.textContent = 'OCR 识别结果';
+            resultContent.innerHTML = `
+                <div class="audit-extra">${escapeHtml(metaLines.join('\n'))}</div>
+                <details class="audit-section" open>
+                    <summary>识别文本</summary>
+                    <pre class="audit-pre">${escapeHtml(ocrText || '未识别到文字')}</pre>
+                </details>
+            `;
+
+            lastModalText = [
+                modelDescription,
+                '',
+                '[OCR识别文本]',
+                ocrText || '未识别到文字'
+            ].join('\n').trim();
+            lastTransferText = ocrText;
+
+            resultCopyBtn.style.display = 'inline-block';
+            resultCopyBtn.textContent = '复制内容';
+            resultSendInputBtn.style.display = ocrText ? 'inline-block' : 'none';
+            resultSendInputBtn.textContent = '发送到输入框';
+
+            resultModal.style.display = 'block';
+
+            const panelWidth = Math.min(760, window.innerWidth - 36);
+            const top = Math.max(20, Math.round((window.innerHeight - Math.min(680, window.innerHeight * 0.78)) / 2));
+            const left = Math.max(18, Math.round((window.innerWidth - panelWidth) / 2));
+            resultPanel.style.position = 'absolute';
+            resultPanel.style.top = `${top}px`;
+            resultPanel.style.left = `${left}px`;
+        }
+
         function hideSavePanel() {
             savePanel.style.display = 'none';
         }
 
         let isLoading = false; // 追踪加载状态
 
+        document.getElementById('ocr-btn').addEventListener('click', async () => {
+            commitActiveTextInput();
+            isLoading = true;
+            setLoading(true, 'OCR 正在识别中...');
+            try {
+                const result = await ipcRenderer.invoke('editor:ocr-recognize', getCanvasDataUrl());
+                setLoading(false);
+                isLoading = false;
+
+                if (!result || !result.success) {
+                    if (result && result.canceled) {
+                        showToast('OCR 识别已取消', 'info');
+                        return;
+                    }
+                    showResultModal('OCR 识别失败', (result && result.error) || '未知错误', { hideCopy: true });
+                    return;
+                }
+
+                showOcrResultModal(result);
+            } catch (error) {
+                setLoading(false);
+                isLoading = false;
+                if (error.message && error.message.includes('取消')) {
+                    showToast('OCR 识别已取消', 'info');
+                    return;
+                }
+                showResultModal('OCR 识别失败', error.message || String(error), { hideCopy: true });
+            }
+        });
+
         document.getElementById('ai-btn').addEventListener('click', async () => {
             commitActiveTextInput();
             isLoading = true;
-            setLoading(true);
+            setLoading(true, 'AI 正在处理中...');
             try {
                 const result = await ipcRenderer.invoke('editor:ai-explain-and-classify', getCanvasDataUrl());
 
@@ -1692,6 +1789,31 @@
 
         resultCopyBtn.addEventListener('click', () => {
             copyText(lastModalText);
+        });
+
+        resultSendInputBtn.addEventListener('click', async () => {
+            if (!lastTransferText) {
+                showToast('没有可发送的 OCR 文本', 'error');
+                return;
+            }
+
+            resultSendInputBtn.disabled = true;
+            try {
+                const result = await ipcRenderer.invoke('editor:send-ocr-to-input', lastTransferText);
+                if (result && result.success) {
+                    hideResultModal();
+                    showToast('已发送到主输入框', 'success', 1000);
+                    setTimeout(() => {
+                        ipcRenderer.send('editor:cancel');
+                    }, 260);
+                } else {
+                    showToast((result && result.error) || '发送失败', 'error');
+                }
+            } catch (error) {
+                showToast(error.message || '发送失败', 'error');
+            } finally {
+                resultSendInputBtn.disabled = false;
+            }
         });
 
         resultCloseBtn.addEventListener('click', hideResultModal);
