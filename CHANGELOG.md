@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.0.2 - 2026-05-14
+
+### Release Type
+
+Multi-platform native installer release for the local PaddleOCR.js OCR workflow.
+
+### Highlights
+
+- Expanded GitHub Actions release builds from macOS arm64 only to macOS arm64, macOS x64, Windows x64, and Linux x64.
+- Switched release assets from packaged app zip archives to native installer artifacts where Forge supports them.
+- Added macOS DMG generation through Electron Forge.
+- Normalized release asset names to ASCII names for stable downloads across GitHub Actions and browsers.
+
+### Release Assets
+
+- macOS arm64: `.dmg`
+- macOS x64: `.dmg`
+- Windows x64: `.exe`
+- Linux x64: `.deb` and `.rpm`
+
 ## v1.0.1 - 2026-05-14
 
 ### Release Type

@@ -251,7 +251,7 @@ LOCAL DETECTION
 
 ## 🏷️ 编译与发版
 
-项目通过 GitHub Actions 在推送 `v*` tag 时自动创建 GitHub Release，并上传 macOS arm64 预编译 zip。release 包会在 CI 中重新生成 PaddleOCR.js browser bundle、下载 PP-OCRv5 本地模型、运行 OCR 测试，再执行 Electron Forge 打包。
+项目通过 GitHub Actions 在推送 `v*` tag 时自动创建 GitHub Release，并上传多端原生安装/运行包：macOS arm64/x64 DMG、Windows x64 EXE、Linux x64 DEB/RPM。release 包会在 CI 中重新生成 PaddleOCR.js browser bundle、下载 PP-OCRv5 本地模型、校验 OCR runtime 资产，再执行 Electron Forge 打包。
 
 本地完整编译链路：
 
@@ -268,10 +268,10 @@ node node_modules/@electron-forge/cli/dist/electron-forge.js make --platform dar
 ```bash
 npm install --package-lock-only
 git add package.json package-lock.json CHANGELOG.md docs/release.md README.md .github/workflows/release.yml
-git commit -m "chore: prepare v1.0.1 release"
+git commit -m "chore: prepare v1.0.2 release"
 git push origin master
-git tag -a v1.0.1 -m "Release v1.0.1"
-git push origin v1.0.1
+git tag -a v1.0.2 -m "Release v1.0.2"
+git push origin v1.0.2
 ```
 
 详细说明见 [docs/release.md](docs/release.md)，版本说明见 [CHANGELOG.md](CHANGELOG.md)。
