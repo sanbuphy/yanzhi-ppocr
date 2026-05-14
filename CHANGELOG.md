@@ -12,7 +12,7 @@ Production release for the local PaddleOCR.js OCR workflow and automated GitHub 
 - Added macOS arm64 precompiled release package generation.
 - Included local PaddleOCR.js browser inference assets in the release build.
 - Included PP-OCRv5 mobile detection and recognition model cache in the packaged app.
-- Verified the local OCR path in CI before packaging.
+- Verified required OCR runtime assets in CI before packaging.
 - Hardened CI model download with IPv4 requests, retry handling, size validation, and GitHub Actions cache.
 - Versioned the PP-OCRv5 model tar files required by CI release packaging to avoid external model-source outages during release builds.
 
@@ -40,7 +40,7 @@ The release workflow runs the following checks before creating a GitHub Release 
 - `npm ci`
 - `npm run build:paddleocr-js`
 - `npm run download:paddleocr-js-models`
-- `npm run test:paddleocr-js`
+- Validate PaddleOCR.js bundle, ORT wasm, and PP-OCRv5 model files
 - `electron-forge make --platform darwin --arch arm64`
 
 ### Release Asset

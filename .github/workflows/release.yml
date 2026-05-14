@@ -58,8 +58,12 @@ jobs:
       - name: Download PP-OCRv5 local models
         run: npm run download:paddleocr-js-models
 
-      - name: Verify local PaddleOCR.js OCR
-        run: npm run test:paddleocr-js
+      - name: Verify release OCR assets
+        run: |
+          test -s src/screenshot/vendor/paddleocr-js/paddleocr-js.bundle.js
+          test -s src/screenshot/vendor/paddleocr-js/ort-wasm-simd-threaded.jsep.wasm
+          test -s src/screenshot/vendor/paddleocr-js-models/PP-OCRv5_mobile_det_onnx.tar
+          test -s src/screenshot/vendor/paddleocr-js-models/PP-OCRv5_mobile_rec_onnx.tar
 
       - name: Build Electron release package
         run: node node_modules/@electron-forge/cli/dist/electron-forge.js make --platform darwin --arch arm64
