@@ -111,11 +111,13 @@ out/make/zip/darwin/arm64/研知科研助手-darwin-arm64-<version>.zip
 1. checkout 对应 tag
 2. 安装依赖
 3. 生成 PaddleOCR.js browser assets
-4. 下载 PP-OCRv5 本地模型
+4. 恢复或写入 PP-OCRv5 模型缓存
 5. 运行 OCR 测试
 6. 打 macOS arm64 zip
 7. 创建或更新 GitHub Release
 8. 上传 zip 产物
+
+模型下载脚本会强制使用 IPv4，并带有重试、超时和文件大小校验。GitHub Actions 同时缓存 `src/screenshot/vendor/paddleocr-js-models`，用于降低外部模型源网络波动对发版的影响。
 
 ## 5. 标准发版步骤
 

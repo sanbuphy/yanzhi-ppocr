@@ -47,6 +47,14 @@ jobs:
       - name: Build PaddleOCR.js browser assets
         run: npm run build:paddleocr-js
 
+      - name: Restore PP-OCRv5 model cache
+        uses: actions/cache@v4
+        with:
+          path: src/screenshot/vendor/paddleocr-js-models
+          key: ppocrv5-models-${{ runner.os }}-${{ hashFiles('scripts/download-paddleocr-js-models.js') }}
+          restore-keys: |
+            ppocrv5-models-${{ runner.os }}-
+
       - name: Download PP-OCRv5 local models
         run: npm run download:paddleocr-js-models
 

@@ -13,6 +13,7 @@ Production release for the local PaddleOCR.js OCR workflow and automated GitHub 
 - Included local PaddleOCR.js browser inference assets in the release build.
 - Included PP-OCRv5 mobile detection and recognition model cache in the packaged app.
 - Verified the local OCR path in CI before packaging.
+- Hardened CI model download with IPv4 requests, retry handling, size validation, and GitHub Actions cache.
 
 ### OCR Runtime
 
