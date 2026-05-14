@@ -29,6 +29,7 @@ AI 辅助科研知识体系助手
 - @17825470707yx-sketch- [17825470707yx-sketch](https://github.com/17825470707yx-sketch)
 - @soulll1- [soulll1](https://github.com/soulll1)
 - @ZC_N- [ZC_N](https://github.com/Anachronism-N)
+- 天朗教育
 
 ## ⚡ 项目定位
 
