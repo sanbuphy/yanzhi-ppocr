@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, for example v1.0.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  macos-arm64:
+    name: Build macOS arm64 release
+    runs-on: macos-14
+
+    steps:
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build PaddleOCR.js browser assets
+        run: npm run build:paddleocr-js
+
+      - name: Download PP-OCRv5 local models
+        run: npm run download:paddleocr-js-models
+
+      - name: Verify local PaddleOCR.js OCR
+        run: npm run test:paddleocr-js
+
+      - name: Build Electron release package
+        run: node node_modules/@electron-forge/cli/dist/electron-forge.js make --platform darwin --arch arm64
+
+      - name: Locate release asset
+        id: asset
+        shell: bash
+        run: |
+          ASSET_PATH="$(find out/make/zip/darwin/arm64 -name '*.zip' -type f | head -n 1)"
+          if [ -z "$ASSET_PATH" ]; then
+            echo "No macOS arm64 zip was produced" >&2
+            exit 1
+          fi
+          echo "path=$ASSET_PATH" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$ASSET_PATH")" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: 研知科研助手 ${{ steps.release.outputs.tag }}
+          files: ${{ steps.asset.outputs.path }}
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          body: |
+            ## 研知科研助手 ${{ steps.release.outputs.tag }}
+
+            这是 1.0 发布包，包含 macOS arm64 预编译版本。
+
+            ### Included
+            - Electron 桌面应用预编译 zip
+            - 本地 PaddleOCR.js 浏览器推理 bundle
+            - PP-OCRv5_mobile_det / PP-OCRv5_mobile_rec 本地 OCR 模型
+            - OCR 结果面板、复制内容、发送到输入框、AI 解读流程
+
+            ### Verification
+            - `npm run build:paddleocr-js`
+            - `npm run download:paddleocr-js-models`
+            - `npm run test:paddleocr-js`
+            - `electron-forge make --platform darwin --arch arm64`
