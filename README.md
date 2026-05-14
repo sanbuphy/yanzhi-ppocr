@@ -134,6 +134,24 @@ npm start
 - 默认推理后端：`auto`，测试脚本固定使用 `wasm`
 - 运行方式：Electron 主进程注册 `ppocrjs://local` 本地协议，在隐藏 BrowserWindow 中注入 PaddleOCR.js bundle，模型与 ORT wasm 均从本地缓存读取
 
+PaddleOCR 官方将 `PaddleOCR.js` 定义为可在浏览器中运行 PP-OCR 产线的 OCR SDK，npm 包名为 `@paddleocr/paddleocr-js`。它通过 `PaddleOCR.create()` 初始化检测与识别模型，通过 `predict(image)` 返回识别行、置信度、耗时和实际运行后端；输入可以是 `Blob`、`File`、`ImageBitmap`、`ImageData`、`HTMLCanvasElement`、`HTMLImageElement` 等浏览器图像对象，也支持 worker 模式。
+
+本项目采用的是 PaddleOCR 官方 PP-OCRv5 的轻量端侧组合，而不是 PaddleOCR-VL：
+
+| 模块 | 本项目模型 | 官方基线/benchmark | 官方耗时参考 | 模型大小 |
+| :--- | :--- | :--- | :--- | :--- |
+| 文本检测 | `PP-OCRv5_mobile_det` | Detection Hmean `79.0%`，对比 `PP-OCRv4_mobile_det` 的 `63.8%` | GPU `10.67 / 6.36 ms`，CPU `57.77 / 28.15 ms` | `4.7 MB` |
+| 文本识别 | `PP-OCRv5_mobile_rec` | 平均识别准确率 `81.29%`，对比 `PP-OCRv4_mobile_rec` 的 `78.74%`；多场景细分：中文 `81.29%`、英文 `66.00%`、繁中 `83.55%`、日文 `54.65%` | GPU `5.43 / 1.46 ms`，CPU `21.20 / 5.32 ms` | `16 MB` |
+
+> 上表来自 PaddleOCR 官方文档。官方说明这些耗时只统计模型推理，不包含预处理、后处理、截图、Electron 窗口通信和 wasm 初始化；本项目弹窗内显示的 `耗时` 是端到端实际运行时间，因此更接近用户体感速度。PaddleOCR 官方 README 同时说明 PP-OCRv5 相比前代整体有约 `13%` 的准确率提升。
+
+官方参考：
+
+- [PaddleOCR GitHub README](https://github.com/PaddlePaddle/PaddleOCR)
+- [PaddleOCR.js browser deployment](https://www.paddleocr.ai/latest/en/version3.x/deployment/browser.html)
+- [Text Detection Module benchmark](https://www.paddleocr.ai/latest/en/version3.x/module_usage/text_detection.html)
+- [Text Recognition Module benchmark](https://www.paddleocr.ai/latest/en/version3.x/module_usage/text_recognition.html)
+
 可选环境变量：
 
 ```bash
@@ -160,6 +178,10 @@ npm run download:paddleocr-js-models
 - `AI解读`：先调用本地 PaddleOCR.js 生成 OCR 文本，再把 OCR 文本拼入提示词交给 AI 做解释、整理和分类。如果没有配置 `GITHUB_TOKEN` 或 `SILICONFLOW_API_KEY`，截图编辑器仍会正常打开，并回退为“本地 OCR only”结果，不会阻塞截图流程。
 - `完成`：把编辑后的截图复制到剪贴板。
 - `取消`：关闭截图编辑器；如果正在 OCR/AI 请求中，则优先取消当前请求。
+
+<div align="center">
+<img src="./asset/paddleocr-ocr-result.png" alt="PaddleOCR.js PP-OCRv5 OCR 识别结果面板" width="92%"/>
+</div>
 
 #### 技术调用链
 
