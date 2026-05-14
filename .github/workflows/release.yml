@@ -68,6 +68,26 @@ jobs:
           echo "path=$ASSET_PATH" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$ASSET_PATH")" >> "$GITHUB_OUTPUT"
 
+      - name: Prepare release notes
+        id: notes
+        shell: bash
+        run: |
+          TAG="${{ steps.release.outputs.tag }}"
+          NOTES_FILE="release-notes.md"
+          awk -v tag="$TAG" '
+            $0 ~ "^## " tag "([[:space:]]|$)" { capture=1; print; next }
+            capture && /^## v/ { exit }
+            capture { print }
+          ' CHANGELOG.md > "$NOTES_FILE"
+          if [ ! -s "$NOTES_FILE" ]; then
+            {
+              echo "## 研知科研助手 $TAG"
+              echo
+              echo "Automated release for $TAG."
+            } > "$NOTES_FILE"
+          fi
+          echo "path=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+
       - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -75,20 +95,4 @@ jobs:
           name: 研知科研助手 ${{ steps.release.outputs.tag }}
           files: ${{ steps.asset.outputs.path }}
           fail_on_unmatched_files: true
-          generate_release_notes: true
-          body: |
-            ## 研知科研助手 ${{ steps.release.outputs.tag }}
-
-            这是 1.0 发布包，包含 macOS arm64 预编译版本。
-
-            ### Included
-            - Electron 桌面应用预编译 zip
-            - 本地 PaddleOCR.js 浏览器推理 bundle
-            - PP-OCRv5_mobile_det / PP-OCRv5_mobile_rec 本地 OCR 模型
-            - OCR 结果面板、复制内容、发送到输入框、AI 解读流程
-
-            ### Verification
-            - `npm run build:paddleocr-js`
-            - `npm run download:paddleocr-js-models`
-            - `npm run test:paddleocr-js`
-            - `electron-forge make --platform darwin --arch arm64`
+          body_path: ${{ steps.notes.outputs.path }}

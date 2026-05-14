@@ -249,6 +249,33 @@ LOCAL DETECTION
 - 清空 [data/workspaces](data/workspaces) 目录下旧配置
 - 在软件界面选择目标文件夹后，使用“新建文件夹”功能建立科研目录
 
+## 🏷️ 编译与发版
+
+项目通过 GitHub Actions 在推送 `v*` tag 时自动创建 GitHub Release，并上传 macOS arm64 预编译 zip。release 包会在 CI 中重新生成 PaddleOCR.js browser bundle、下载 PP-OCRv5 本地模型、运行 OCR 测试，再执行 Electron Forge 打包。
+
+本地完整编译链路：
+
+```bash
+npm ci
+npm run build:paddleocr-js
+npm run download:paddleocr-js-models
+npm run test:paddleocr-js
+node node_modules/@electron-forge/cli/dist/electron-forge.js make --platform darwin --arch arm64
+```
+
+标准发版流程：
+
+```bash
+npm install --package-lock-only
+git add package.json package-lock.json CHANGELOG.md docs/release.md README.md .github/workflows/release.yml
+git commit -m "chore: prepare v1.0.1 release"
+git push origin master
+git tag -a v1.0.1 -m "Release v1.0.1"
+git push origin v1.0.1
+```
+
+详细说明见 [docs/release.md](docs/release.md)，版本说明见 [CHANGELOG.md](CHANGELOG.md)。
+
 ---
 
 感谢使用研知科研助手！如有问题请查阅 [配置方法.md](配置方法.md) 或提交 Issue。
