@@ -7,6 +7,12 @@ AI 辅助科研知识体系助手
 <em>Capture, understand, and organize research knowledge with AI.</em>
 
 <p align="center">
+  <a href="https://www.paddlepaddle.org.cn/"><img src="https://img.shields.io/badge/Supported%20by-PaddlePaddle-0062B1?style=for-the-badge&logo=paddlepaddle&logoColor=white" alt="Supported by PaddlePaddle"/></a>
+  <a href="https://github.com/PaddlePaddle/PaddleOCR"><img src="https://img.shields.io/badge/OCR-PaddleOCR%20PP--OCRv5-1927BA?style=for-the-badge&logo=paddlepaddle&logoColor=white" alt="PaddleOCR PP-OCRv5"/></a>
+  <a href="https://github.com/PaddlePaddle/PaddleOCR/tree/main/paddleocr-js"><img src="https://img.shields.io/badge/PaddleOCR.js-Official%20Browser%20Inference%20SDK-00A1D6?style=for-the-badge&logo=javascript&logoColor=white" alt="PaddleOCR.js Official Browser Inference SDK"/></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/ddddfrank/yanzhi/stargazers"><img src="https://img.shields.io/github/stars/ddddfrank/yanzhi?style=flat-square&color=DAA520" alt="GitHub Stars"/></a>
   <a href="https://github.com/ddddfrank/yanzhi/network"><img src="https://img.shields.io/github/forks/ddddfrank/yanzhi?style=flat-square" alt="GitHub Forks"/></a>
   <a href="https://www.electronjs.org/"><img src="https://img.shields.io/badge/Electron-App-47848F?style=flat-square&logo=electron&logoColor=white" alt="Electron"/></a>
