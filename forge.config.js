@@ -20,11 +20,27 @@ module.exports = {
     },
     {
       name: '@electron-forge/maker-deb',
-      config: {},
+      config: {
+        options: {
+          name: 'yanzhi-research-assistant',
+          productName: 'Yanzhi Research Assistant',
+          maintainer: 'liyijia <1164763855@qq.com>',
+          homepage: 'https://github.com/sanbuphy/yanzhi-ppocr',
+          description: 'AI research assistant with local PaddleOCR.js OCR.',
+        },
+      },
     },
     {
       name: '@electron-forge/maker-rpm',
-      config: {},
+      config: {
+        options: {
+          name: 'yanzhi-research-assistant',
+          productName: 'Yanzhi Research Assistant',
+          maintainer: 'liyijia <1164763855@qq.com>',
+          homepage: 'https://github.com/sanbuphy/yanzhi-ppocr',
+          description: 'AI research assistant with local PaddleOCR.js OCR.',
+        },
+      },
     },
   ],
   plugins: [

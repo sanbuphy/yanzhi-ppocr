@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.3 - 2026-05-14
+
+### Release Type
+
+Patch release for multi-platform native installer packaging.
+
+### Highlights
+
+- Added Linux DEB/RPM maker metadata required by Electron Forge.
+- Keeps release outputs as native installers: DMG, EXE, DEB, and RPM.
+
 ## v1.0.2 - 2026-05-14
 
 ### Release Type

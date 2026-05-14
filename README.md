@@ -268,10 +268,10 @@ node node_modules/@electron-forge/cli/dist/electron-forge.js make --platform dar
 ```bash
 npm install --package-lock-only
 git add package.json package-lock.json CHANGELOG.md docs/release.md README.md .github/workflows/release.yml
-git commit -m "chore: prepare v1.0.2 release"
+git commit -m "chore: prepare v1.0.3 release"
 git push origin master
-git tag -a v1.0.2 -m "Release v1.0.2"
-git push origin v1.0.2
+git tag -a v1.0.3 -m "Release v1.0.3"
+git push origin v1.0.3
 ```
 
 详细说明见 [docs/release.md](docs/release.md)，版本说明见 [CHANGELOG.md](CHANGELOG.md)。
