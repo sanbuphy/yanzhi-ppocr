@@ -4,6 +4,7 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
+    icon: './assets/icon',
   },
   rebuildConfig: {},
   makers: [
@@ -27,6 +28,8 @@ module.exports = {
           maintainer: 'liyijia <1164763855@qq.com>',
           homepage: 'https://github.com/sanbuphy/yanzhi-ppocr',
           description: 'AI research assistant with local PaddleOCR.js OCR.',
+          icon: './assets/icon.png',
+          categories: ['Utility', 'Office'],
         },
       },
     },
@@ -39,6 +42,8 @@ module.exports = {
           maintainer: 'liyijia <1164763855@qq.com>',
           homepage: 'https://github.com/sanbuphy/yanzhi-ppocr',
           description: 'AI research assistant with local PaddleOCR.js OCR.',
+          icon: './assets/icon.png',
+          categories: ['Utility', 'Office'],
         },
       },
     },

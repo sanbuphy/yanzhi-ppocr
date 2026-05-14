@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.4 - 2026-05-14
+
+### Release Type
+
+Patch release for Linux native package generation.
+
+### Highlights
+
+- Added a real application PNG icon for Electron Forge packager and Linux DEB/RPM makers.
+- Added Linux desktop categories for package metadata.
+
 ## v1.0.3 - 2026-05-14
 
 ### Release Type
