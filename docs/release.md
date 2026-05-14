@@ -14,6 +14,8 @@
 - `PP-OCRv5_mobile_det_onnx.tar`
 - `PP-OCRv5_mobile_rec_onnx.tar`
 
+为保证 GitHub Actions 发版稳定性，PP-OCRv5 的两个模型 tar 文件作为 release-critical artifacts 纳入版本控制；PaddleOCR.js bundle 和 ORT wasm 仍在 CI 中由 npm 依赖生成。
+
 ## 2. 本地编译
 
 ### 环境要求
@@ -117,7 +119,7 @@ out/make/zip/darwin/arm64/研知科研助手-darwin-arm64-<version>.zip
 7. 创建或更新 GitHub Release
 8. 上传 zip 产物
 
-模型下载脚本会强制使用 IPv4，并带有重试、超时和文件大小校验。GitHub Actions 同时缓存 `src/screenshot/vendor/paddleocr-js-models`，用于降低外部模型源网络波动对发版的影响。
+模型 tar 已随仓库 checkout；模型下载脚本仍会做文件大小校验。如果模型文件不存在，脚本会强制使用 IPv4 并带重试、超时逻辑从官方源下载。GitHub Actions 同时缓存 `src/screenshot/vendor/paddleocr-js-models`，用于降低外部模型源网络波动对发版的影响。
 
 ## 5. 标准发版步骤
 

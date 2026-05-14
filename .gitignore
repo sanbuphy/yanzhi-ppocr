@@ -95,5 +95,8 @@ temp/
 .claude/
 data/workspaces/
 
-# Generated PaddleOCR.js browser bundle and local model cache
-src/screenshot/vendor/
+# Generated PaddleOCR.js browser bundle; release-critical PP-OCRv5 model tar files are versioned.
+src/screenshot/vendor/*
+!src/screenshot/vendor/paddleocr-js-models/
+src/screenshot/vendor/paddleocr-js-models/*
+!src/screenshot/vendor/paddleocr-js-models/*.tar
