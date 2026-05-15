@@ -107,7 +107,7 @@ out/make/dmg/darwin/arm64/*.dmg
 
 触发方式：
 
-- push 任意 `v*` tag，例如 `v1.0.6`
+- push 任意 `v*` tag，例如 `v1.0.7`
 - 在 GitHub Actions 页面手动运行 Release workflow，并输入 tag
 
 自动发版会执行：
@@ -117,9 +117,9 @@ out/make/dmg/darwin/arm64/*.dmg
 3. 生成 PaddleOCR.js browser assets
 4. 恢复或写入 PP-OCRv5 模型缓存
 5. 校验 PaddleOCR.js bundle、ORT wasm 和 PP-OCRv5 模型文件
-6. 并行打 macOS arm64、macOS x64、Windows x64、Linux x64 原生产物
+6. 并行打 macOS arm64、Windows x64、Linux x64 原生产物
 7. 创建或更新 GitHub Release
-8. 上传 `.dmg`、`.exe`、`.deb`、`.rpm` 产物
+8. 上传 `.dmg`、`.exe`、`.deb` 产物
 
 模型 tar 已随仓库 checkout；模型下载脚本仍会做文件大小校验。如果模型文件不存在，脚本会强制使用 IPv4 并带重试、超时逻辑从官方源下载。GitHub Actions 同时缓存 `src/screenshot/vendor/paddleocr-js-models`，用于降低外部模型源网络波动对发版的影响。
 
@@ -149,15 +149,15 @@ npm install --package-lock-only
 
 ```bash
 git add package.json package-lock.json CHANGELOG.md docs/release.md README.md .github/workflows/release.yml
-git commit -m "chore: prepare v1.0.6 release"
+git commit -m "chore: prepare v1.0.7 release"
 git push origin master
 ```
 
 ### 创建并推送 tag
 
 ```bash
-git tag -a v1.0.6 -m "Release v1.0.6"
-git push origin v1.0.6
+git tag -a v1.0.7 -m "Release v1.0.7"
+git push origin v1.0.7
 ```
 
 tag 推送后，GitHub Actions 会自动创建 Release 并上传预编译包。

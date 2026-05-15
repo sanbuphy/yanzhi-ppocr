@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.7 - 2026-05-15
+
+### Release Type
+
+Patch release for release matrix simplification.
+
+### Highlights
+
+- Remove the macOS x64 release job from GitHub Actions.
+- Keep release artifacts focused on macOS arm64 DMG, Windows x64 EXE, and Linux x64 DEB.
+
 ## v1.0.6 - 2026-05-15
 
 ### Release Type

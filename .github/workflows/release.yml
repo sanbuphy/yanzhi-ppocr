@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag, for example v1.0.6'
+        description: 'Release tag, for example v1.0.7'
         required: true
         type: string
 
@@ -27,12 +27,6 @@ jobs:
             platform: darwin
             arch: arm64
             asset_name: Yanzhi-Research-Assistant-macos-arm64
-            maker_targets: '@electron-forge/maker-dmg'
-          - label: macOS x64
-            os: macos-13
-            platform: darwin
-            arch: x64
-            asset_name: Yanzhi-Research-Assistant-macos-x64
             maker_targets: '@electron-forge/maker-dmg'
           - label: Windows x64
             os: windows-latest

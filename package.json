@@ -1,7 +1,7 @@
 {
   "name": "yanzhi-research-assistant",
   "productName": "研知科研助手",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "My Electron application description",
   "main": "src/index.js",
   "scripts": {
