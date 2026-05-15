@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.6 - 2026-05-15
+
+### Release Type
+
+Patch release for Linux CI release packaging stability.
+
+### Highlights
+
+- Limit Linux release packaging to the DEB maker so RPM environment issues do not block the release.
+- Make each platform invoke its intended Electron Forge maker explicitly.
+
 ## v1.0.5 - 2026-05-14
 
 ### Release Type

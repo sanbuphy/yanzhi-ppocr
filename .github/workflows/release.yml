@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag, for example v1.0.5'
+        description: 'Release tag, for example v1.0.6'
         required: true
         type: string
 
@@ -27,21 +27,25 @@ jobs:
             platform: darwin
             arch: arm64
             asset_name: Yanzhi-Research-Assistant-macos-arm64
+            maker_targets: '@electron-forge/maker-dmg'
           - label: macOS x64
             os: macos-13
             platform: darwin
             arch: x64
             asset_name: Yanzhi-Research-Assistant-macos-x64
+            maker_targets: '@electron-forge/maker-dmg'
           - label: Windows x64
             os: windows-latest
             platform: win32
             arch: x64
             asset_name: Yanzhi-Research-Assistant-windows-x64
+            maker_targets: '@electron-forge/maker-squirrel'
           - label: Linux x64
             os: ubuntu-latest
             platform: linux
             arch: x64
             asset_name: Yanzhi-Research-Assistant-linux-x64
+            maker_targets: '@electron-forge/maker-deb'
 
     steps:
       - name: Resolve release tag
@@ -70,7 +74,7 @@ jobs:
 
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y dpkg fakeroot rpm
+        run: sudo apt-get update && sudo apt-get install -y dpkg fakeroot
 
       - name: Build PaddleOCR.js browser assets
         run: npm run build:paddleocr-js
@@ -95,7 +99,7 @@ jobs:
           test -s src/screenshot/vendor/paddleocr-js-models/PP-OCRv5_mobile_rec_onnx.tar
 
       - name: Build native installer
-        run: node node_modules/@electron-forge/cli/dist/electron-forge.js make --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+        run: node node_modules/@electron-forge/cli/dist/electron-forge.js make --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --targets ${{ matrix.maker_targets }}
 
       - name: Collect native release assets
         shell: bash
