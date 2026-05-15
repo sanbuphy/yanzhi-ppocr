@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag, for example v1.0.4'
+        description: 'Release tag, for example v1.0.5'
         required: true
         type: string
 
@@ -70,7 +70,7 @@ jobs:
 
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y fakeroot rpm
+        run: sudo apt-get update && sudo apt-get install -y dpkg fakeroot rpm
 
       - name: Build PaddleOCR.js browser assets
         run: npm run build:paddleocr-js

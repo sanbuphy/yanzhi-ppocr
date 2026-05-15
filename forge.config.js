@@ -4,6 +4,7 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
+    executableName: 'yanzhi-research-assistant',
     icon: './assets/icon',
   },
   rebuildConfig: {},

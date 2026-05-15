@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.5 - 2026-05-14
+
+### Release Type
+
+Patch release for Linux DEB/RPM binary name resolution.
+
+### Highlights
+
+- Set Electron Packager `executableName` to `yanzhi-research-assistant`.
+- Fixes Linux makers looking for the ASCII package binary inside the packaged app directory.
+
 ## v1.0.4 - 2026-05-14
 
 ### Release Type

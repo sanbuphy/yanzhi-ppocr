@@ -107,7 +107,7 @@ out/make/dmg/darwin/arm64/*.dmg
 
 触发方式：
 
-- push 任意 `v*` tag，例如 `v1.0.4`
+- push 任意 `v*` tag，例如 `v1.0.5`
 - 在 GitHub Actions 页面手动运行 Release workflow，并输入 tag
 
 自动发版会执行：
@@ -149,15 +149,15 @@ npm install --package-lock-only
 
 ```bash
 git add package.json package-lock.json CHANGELOG.md docs/release.md README.md .github/workflows/release.yml
-git commit -m "chore: prepare v1.0.4 release"
+git commit -m "chore: prepare v1.0.5 release"
 git push origin master
 ```
 
 ### 创建并推送 tag
 
 ```bash
-git tag -a v1.0.4 -m "Release v1.0.4"
-git push origin v1.0.4
+git tag -a v1.0.5 -m "Release v1.0.5"
+git push origin v1.0.5
 ```
 
 tag 推送后，GitHub Actions 会自动创建 Release 并上传预编译包。
